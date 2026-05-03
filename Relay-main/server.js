@@ -1,4 +1,4 @@
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+require('dotenv').config({ path: require('path').join(__dirname, '.env'), override: false });
 const express      = require('express');
 const cors         = require('cors');
 const path         = require('path');
@@ -101,7 +101,8 @@ const corsOptions = {
     if (!origin) return cb(null, true);
     if (process.env.NODE_ENV !== 'production') return cb(null, true);
     if (allowedOrigins.includes(origin)) return cb(null, true);
-    if (/https:\/\/reconciler-.*\.vercel\.app$/.test(origin)) return cb(null, true);
+    if (/https:\/\/.*\.vercel\.app$/.test(origin)) return cb(null, true);
+    if (/https:\/\/.*\.onrender\.com$/.test(origin)) return cb(null, true);
     if (process.env.ALLOW_ALL_ORIGINS === 'true') return cb(null, true);
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },

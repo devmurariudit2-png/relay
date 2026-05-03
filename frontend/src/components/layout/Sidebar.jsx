@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 const NAV = [
   { id: "dashboard",    icon: "⊞", label: "Dashboard" },
   { id: "transactions", icon: "⇄", label: "Transactions" },
@@ -11,7 +13,8 @@ const NAV = [
   { id: "api-docs",    icon: "⌘", label: "API Docs" },
 ];
 
-export default function Sidebar({ tab, setTab, user, onLogout, loggingOut }) {
+export default function Sidebar({ tab, user, onLogout, loggingOut }) {
+  const navigate = useNavigate();
   return (
     <div style={{ width: 220, background: "#FFFFFF", borderRight: "1px solid #E5E7EB", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0 }}>
       {/* Logo */}
@@ -30,7 +33,7 @@ export default function Sidebar({ tab, setTab, user, onLogout, loggingOut }) {
       {/* Nav */}
       <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
         {NAV.filter(n => !n.adminOnly || user?.role === "admin").map(n => (
-          <button key={n.id} onClick={() => setTab(n.id)}
+          <button key={n.id} onClick={() => navigate(`/app/${n.id}`)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 8, background: tab === n.id ? "rgba(239,68,68,.06)" : "transparent", border: tab === n.id ? "1px solid rgba(239,68,68,.15)" : "1px solid transparent", color: tab === n.id ? "#EF4444" : "#6B7280", marginBottom: 2, transition: "all .15s", fontWeight: tab === n.id ? 600 : 400 }}
             onMouseEnter={e => { if (tab !== n.id) { e.currentTarget.style.background = "rgba(0,0,0,.02)"; e.currentTarget.style.color = "#374151"; } }}
             onMouseLeave={e => { if (tab !== n.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#6B7280"; } }}>
