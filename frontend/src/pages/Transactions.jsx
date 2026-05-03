@@ -27,8 +27,9 @@ export default function Transactions({ user, toast }) {
     setLoading(true);
     try {
       const r = await API.getTransactions({ ...filter, search: search || undefined, page, limit: 50 });
-      setTxs(r.data || r);
-      setTxMeta(r.meta || null);
+      const items = r.txs || r.data || (Array.isArray(r) ? r : []);
+      setTxs(items);
+      setTxMeta(r.meta || { page: r.page, pages: Math.ceil(r.total / r.limit), total: r.total });
       setTxPage(page);
     }
     catch (e) { toast(e.message, "error"); }

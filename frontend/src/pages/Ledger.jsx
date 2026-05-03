@@ -10,10 +10,87 @@ export default function Ledger({ toast }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const downloadFile = (name, content, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const buildSimplePdf = (rawText) => {
+    const escapePdfText = (value) => value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+    const lines = rawText.split("\n");
+    const textOps = lines
+      .map((line, i) => {
+        const y = 780 - i * 16;
+        return `BT /F1 12 Tf 50 ${y} Td (${escapePdfText(line)}) Tj ET`;
+      })
+      .join("\n");
+    const stream = `${textOps}\n`;
+
+    const objects = [
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj",
+      "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      `5 0 obj << /Length ${stream.length} >> stream\n${stream}endstream endobj`,
+    ];
+
+    let pdf = "%PDF-1.4\n";
+    const offsets = [0];
+    objects.forEach((obj) => {
+      offsets.push(pdf.length);
+      pdf += `${obj}\n`;
+    });
+    const xrefStart = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n`;
+    pdf += "0000000000 65535 f \n";
+    offsets.slice(1).forEach((off) => {
+      pdf += `${String(off).padStart(10, "0")} 00000 n \n`;
+    });
+    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+    return new TextEncoder().encode(pdf);
+  };
+
+  const exportCSV = () => {
+    if (!rows.length) return;
+    const headers = ["Date", "Description", "Category", "Ref", "Debit", "Credit", "Balance", "Status"];
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => [
+        r.date, 
+        JSON.stringify(r.description), 
+        r.category || "", 
+        r.reference || "", 
+        r.debit || 0, 
+        r.credit || 0, 
+        r.balance || 0, 
+        r.status
+      ].join(","))
+    ].join("\n");
+    downloadFile(`ledger-${source}-${new Date().toISOString().slice(0, 10)}.csv`, csvContent, "text/csv;charset=utf-8");
+  };
+
+  const exportPDF = () => {
+    if (!rows.length) return;
+    const text = [
+      `LEDGER REPORT - ${source.toUpperCase()}`,
+      "===========================",
+      ...rows.map(r => `${r.date} | ${r.description.slice(0, 20)} | Bal: ${r.balance}`)
+    ].join("\n");
+    const pdfBytes = buildSimplePdf(text);
+    downloadFile(`ledger-${source}-${new Date().toISOString().slice(0, 10)}.pdf`, pdfBytes, "application/pdf");
+  };
+
   useEffect(() => {
     setLoading(true);
     API.getLedger(source).then(setRows).catch(e => toast(e.message, "error")).finally(() => setLoading(false));
-  }, [source]);
+  }, [source, toast]);
 
   return (
     <PageShell title="Ledger" sub="Running balance view"
@@ -26,6 +103,9 @@ export default function Ledger({ toast }) {
               {s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
           ))}
+          <div style={{ width: 1, background: "#E5E7EB", margin: "0 4px" }} />
+          <button className="btn-ghost" style={{ fontSize: 12, padding: "6px 10px" }} onClick={exportCSV}>CSV</button>
+          <button className="btn-ghost" style={{ fontSize: 12, padding: "6px 10px" }} onClick={exportPDF}>PDF</button>
         </div>
       }>
       <Card style={{ padding: 0, overflow: "hidden" }}>

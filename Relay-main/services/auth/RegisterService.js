@@ -27,7 +27,7 @@ class RegisterService extends BaseService {
       password,
       orgId,
       orgName,
-      role: "member",
+      role: "admin",
     });
     return { token: this.signToken(user._id), user: user.toSafeObject() };
   }
