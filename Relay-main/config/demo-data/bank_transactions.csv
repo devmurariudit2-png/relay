@@ -1,0 +1,16 @@
+date,description,amount,currency,reference,category
+2024-11-01,Opening Balance Deposit,50000.00,USD,REF-0001,opening
+2024-11-02,Vendor Payment - Acme Supplies,-12400.00,USD,REF-0002,vendor
+2024-11-03,Client Receipt - Delta Systems,21000.00,USD,REF-0003,revenue
+2024-11-04,Office Rent Payment,-8500.00,USD,REF-0004,rent
+2024-11-05,Software Subscription - AWS,-3200.00,USD,REF-0005,cloud
+2024-11-06,Client Receipt - Focal Inc,18000.00,USD,REF-0006,revenue
+2024-11-07,Payroll Transfer,-45000.00,USD,REF-0007,payroll
+2024-11-08,Client Receipt - Glide Works,9800.00,USD,REF-0008,revenue
+2024-11-09,Utility Bills,-1800.00,USD,REF-0009,utilities
+2024-11-10,Bank Charges,-250.00,USD,REF-0010,banking
+2024-11-11,Client Receipt - Bright Studio,8200.00,USD,REF-0011,revenue
+2024-11-12,Travel Reimbursement,-4200.00,USD,REF-0012,travel
+2024-11-13,Client Receipt - Ember Labs,5600.00,USD,REF-0013,revenue
+2024-11-14,Marketing Campaign,-6000.00,USD,REF-0014,marketing
+2024-11-15,Interest Credit,320.00,USD,REF-0015,interest
