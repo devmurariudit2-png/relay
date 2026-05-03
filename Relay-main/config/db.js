@@ -4,43 +4,33 @@ const logger = require('../utils/logger');
 
 async function connectDB() {
   try {
-    let uri = process.env.MONGO_URI;
+    const uri = process.env.MONGO_URI;
 
-    // Check if local MongoDB is responsive
-    const isLocalAlive = await testConnection(uri);
-
-    if (!isLocalAlive && process.env.NODE_ENV === 'development') {
-      if (process.env.DEMO_BYPASS === 'true') {
-        logger.warn('Local MongoDB unavailable. DEMO_BYPASS is true. Falling back to Demo Mode.');
-        return;
+    if (!uri) {
+      logger.error('MONGO_URI is not set! Cannot connect to database.');
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('MONGO_URI must be set in production');
       }
-      logger.info('Local MongoDB unavailable and no Docker detected. Starting In-Memory MongoDB...');
-      try {
-        const { MongoMemoryServer } = require('mongodb-memory-server');
-        const mongod = await MongoMemoryServer.create();
-        uri = mongod.getUri();
-        logger.info(`In-Memory MongoDB started at: ${uri}`);
-      } catch (memErr) {
-        logger.warn('Failed to start In-Memory MongoDB. Falling back to Demo Mode.');
-        return;
-      }
+      logger.warn('No MONGO_URI set. Running without database (demo mode).');
+      return;
     }
 
-    const conn = await mongoose.connect(uri);
+    logger.info(`Attempting MongoDB connection to: ${uri.replace(/\/\/([^:]+):([^@]+)@/, '//$1:***@')}`);
+
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
   } catch (err) {
-    logger.error('MongoDB connection failed. Continuing in Demo Mode...', err);
-  }
-}
-
-async function testConnection(uri) {
-  if (!uri) return false;
-  try {
-    const conn = await mongoose.createConnection(uri, { serverSelectionTimeoutMS: 1000 }).asPromise();
-    await conn.close();
-    return true;
-  } catch (e) {
-    return false;
+    logger.error('MongoDB connection failed:', err.message);
+    if (process.env.NODE_ENV === 'production') {
+      // In production, a failed DB connection is fatal
+      logger.error('Cannot start in production without a database. Exiting.');
+      process.exit(1);
+    }
+    logger.warn('Continuing in Demo Mode without database...');
   }
 }
 
