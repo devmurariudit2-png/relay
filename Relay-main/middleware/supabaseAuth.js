@@ -15,13 +15,18 @@ const protect = async (req, res, next) => {
       return R.unauthorized(res, 'Invalid or expired token');
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    // Extract context directly from custom JWT claims (Zero-Latency!)
+    const role = user.app_metadata?.role || 'member';
+    const org_name = user.app_metadata?.org_name;
+    const currency = user.app_metadata?.currency || 'USD';
 
-    req.user = { ...user, ...(profile || {}), _id: user.id };
+    req.user = { 
+      ...user, 
+      role, 
+      org_name, 
+      currency,
+      _id: user.id 
+    };
     if (!req.context) req.context = {};
     req.context.user = req.user;
     

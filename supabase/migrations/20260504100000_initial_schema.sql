@@ -212,3 +212,49 @@ DROP POLICY IF EXISTS "Admins can view stripe events" ON public.stripe_events;
 CREATE POLICY "Admins can view stripe events" ON public.stripe_events
   FOR SELECT USING (public.is_admin());
 
+-- ── AUTH HOOKS (CUSTOM JWT CLAIMS) ───────────────────────────────────────────
+
+-- Create a function to add custom claims to the JWT (Zero-Latency Auth)
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+AS $$
+  DECLARE
+    claims jsonb;
+    user_role text;
+    user_org text;
+    user_currency text;
+  BEGIN
+    -- Fetch the user profile data
+    SELECT role, org_name, currency INTO user_role, user_org, user_currency
+    FROM public.profiles
+    WHERE id = (event->>'user_id')::uuid;
+
+    -- Extract current claims
+    claims := event->'claims';
+
+    -- Add custom claims
+    IF user_role IS NOT NULL THEN
+      claims := jsonb_set(claims, '{app_metadata, role}', to_jsonb(user_role));
+    END IF;
+    
+    IF user_org IS NOT NULL THEN
+      claims := jsonb_set(claims, '{app_metadata, org_name}', to_jsonb(user_org));
+    END IF;
+
+    IF user_currency IS NOT NULL THEN
+      claims := jsonb_set(claims, '{app_metadata, currency}', to_jsonb(user_currency));
+    END IF;
+
+    -- Update the event with the modified claims
+    event := jsonb_set(event, '{claims}', claims);
+
+    RETURN event;
+  END;
+$$;
+
+-- Grant execution permissions
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, anon, public;
