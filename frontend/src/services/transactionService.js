@@ -139,10 +139,9 @@ class TransactionService {
   }
 
   /**
-   * Format and log errors consistently
+   * Format errors consistently
    */
   formatError(error) {
-    console.error('[TransactionService] Error:', error);
     return {
       message: error.message || 'An error occurred',
       status: error.status,
