@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "../supabase.js";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Card from "../components/ui/Card.jsx";
@@ -25,6 +26,16 @@ export default function Tickets({ user, toast }) {
   const tickets = r?.data || r || [];
 
   const load = () => { queryClient.invalidateQueries({ queryKey: ['tickets'] }); };
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('tickets-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => {
+        load(); // Instantly refresh tickets when DB changes
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const create = async () => {
     setSaving(true);

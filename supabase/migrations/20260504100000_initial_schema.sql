@@ -64,6 +64,13 @@ CREATE TABLE IF NOT EXISTS public.tickets (
 
 ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
 
+-- Enable Realtime for Tickets
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime;
+COMMIT;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.tickets;
+
 -- 5. Subscriptions (Stripe Integration)
 CREATE TABLE IF NOT EXISTS public.subscriptions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
