@@ -1,32 +1,32 @@
 const BaseService = require('../BaseService');
-// Models removed
-// Models removed
+const supabase = require('../../config/supabase');
 
 class GetTeamService extends BaseService {
   async run() {
     const { user } = this.args;
-    const filter = user ? { orgId: user.orgId } : { orgId: this.user.orgId };
-    
-    const [users, invites] = await Promise.all([
-      User.find(filter).select('-password').sort({ createdAt: 1 }).lean(),
-      InviteToken.find({ ...filter, expiresAt: { $gt: new Date() } }).lean()
-    ]);
+    const currentUser = user || this.user;
 
-    const activeMembers = users.map(u => ({
-      _id: u._id, name: u.name, email: u.email,
-      role: u.role, active: u.active,
-      orgId: u.orgId, orgName: u.orgName,
-      lastLoginAt: u.lastLoginAt, createdAt: u.createdAt,
+    let query = supabase.from('profiles').select('*');
+
+    // Filter by organization if the user has one (non-admins only see their org)
+    const userOrg = currentUser?.org_name;
+    if (userOrg && currentUser?.role !== 'admin') {
+      query = query.eq('org_name', userOrg);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: true });
+    if (error) throw error;
+
+    return (data || []).map(u => ({
+      _id: u.id,
+      name: u.full_name || u.email,
+      email: u.email,
+      role: u.role,
+      active: u.active,
+      orgId: u.org_name,
+      orgName: u.org_name,
+      createdAt: u.created_at,
     }));
-
-    const pendingInvites = invites.map(i => ({
-      _id: i._id, name: "Pending Invite", email: i.email,
-      role: i.role, active: false,
-      isInvite: true,
-      createdAt: i.createdAt,
-    }));
-
-    return [...activeMembers, ...pendingInvites];
   }
 }
 

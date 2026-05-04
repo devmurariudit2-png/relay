@@ -3,16 +3,30 @@ const supabase = require('../../config/supabase');
 
 class CreateTicketService extends BaseService {
   async run() {
-    const { data, error } = await supabase.from('tickets').insert([{
-      ...this.args,
+    const { title, description, priority, category } = this.args;
+
+    const insertData = {
       user_id: this.userId,
-      status: 'open'
-    }]).select().single();
+      title,
+      description,
+      priority: priority || 'medium',
+      category: category || 'other',
+      status: 'open',
+    };
+
+    const { data, error } = await supabase
+      .from('tickets')
+      .insert([insertData])
+      .select()
+      .single();
 
     if (error) throw error;
-    
-    // mapId logic
-    return { ...data, _id: data.id };
+
+    return {
+      ...data,
+      _id: data.id,
+      createdAt: data.created_at,
+    };
   }
 }
 

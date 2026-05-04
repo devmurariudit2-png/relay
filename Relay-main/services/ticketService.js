@@ -1,95 +1,122 @@
-// Models removed
+// Legacy ticketService.js - all ticket operations are now handled by Supabase-based services:
+// - ListTicketsService
+// - CreateTicketService
+// - GetTicketService
+// - UpdateTicketService
+// - DeleteTicketService
+
+const supabase = require('../config/supabase');
 
 const listTickets = async (user, query) => {
   const page = query.page || 1;
   const limit = query.limit || 20;
-  const skip = (page - 1) * limit;
-  const filter = user.role === 'admin' ? {} : { user: user._id };
 
-  if (query.status) filter.status = query.status;
-  if (query.priority) filter.priority = query.priority;
-  if (query.category) filter.category = query.category;
+  let q = supabase.from('tickets').select('*, ticket_comments(*)');
 
-  const [tickets, total] = await Promise.all([
-    Ticket.find(filter)
-      .populate('user', 'name email')
-      .populate('assignedTo', 'name email')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit),
-    Ticket.countDocuments(filter),
-  ]);
+  if (user.role !== 'admin') {
+    q = q.eq('user_id', user.id || user._id);
+  }
+  if (query.status) q = q.eq('status', query.status);
+  if (query.priority) q = q.eq('priority', query.priority);
+  if (query.category) q = q.eq('category', query.category);
 
-  return { tickets, page, limit, total };
+  const { data, error } = await q
+    .order('created_at', { ascending: false })
+    .range((page - 1) * limit, page * limit - 1);
+
+  if (error) throw error;
+
+  const tickets = (data || []).map(t => ({
+    ...t,
+    _id: t.id,
+    createdAt: t.created_at,
+    comments: (t.ticket_comments || []).map(c => ({
+      ...c,
+      _id: c.id,
+      createdAt: c.created_at,
+    })),
+  }));
+
+  return { tickets, page, limit, total: tickets.length };
 };
 
 const createTicket = async (user, data) => {
-  const ticket = await Ticket.create({
-    user: user._id,
-    title: data.title,
-    description: data.description,
-    priority: data.priority,
-    category: data.category,
-  });
-  return ticket;
+  const { data: ticket, error } = await supabase
+    .from('tickets')
+    .insert([{
+      user_id: user.id || user._id,
+      title: data.title,
+      description: data.description,
+      priority: data.priority || 'medium',
+      category: data.category || 'other',
+      status: 'open',
+    }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { ...ticket, _id: ticket.id, createdAt: ticket.created_at };
 };
 
 const getTicket = async (user, ticketId) => {
-  const ticket = await Ticket.findById(ticketId)
-    .populate('user', 'name email')
-    .populate('assignedTo', 'name email')
-    .populate('comments.user', 'name email');
+  let q = supabase
+    .from('tickets')
+    .select('*, ticket_comments(*)')
+    .eq('id', ticketId);
 
-  if (!ticket) {
+  if (user.role !== 'admin') {
+    q = q.eq('user_id', user.id || user._id);
+  }
+
+  const { data, error } = await q.single();
+  if (error || !data) {
     const err = new Error('Ticket not found');
     err.status = 404;
     throw err;
   }
 
-  if (user.role !== 'admin' && String(ticket.user._id) !== String(user._id)) {
-    const err = new Error('Access denied');
-    err.status = 403;
-    throw err;
-  }
-
-  return ticket;
+  return {
+    ...data,
+    _id: data.id,
+    createdAt: data.created_at,
+    comments: (data.ticket_comments || []).map(c => ({
+      ...c,
+      _id: c.id,
+      createdAt: c.created_at,
+    })),
+  };
 };
 
 const updateTicket = async (user, ticketId, changes) => {
-  const ticket = await Ticket.findById(ticketId);
-  if (!ticket) {
-    const err = new Error('Ticket not found');
-    err.status = 404;
-    throw err;
-  }
-
-  if (user.role !== 'admin' && String(ticket.user) !== String(user._id)) {
-    const err = new Error('Access denied');
-    err.status = 403;
-    throw err;
-  }
-
-  if (user.role === 'admin') {
-    if (changes.status) ticket.status = changes.status;
-    if (changes.priority) ticket.priority = changes.priority;
-    if (changes.assignedTo) ticket.assignedTo = changes.assignedTo;
-  }
-
+  // Handle comment
   if (changes.comment) {
-    ticket.comments.push({ user: user._id, message: changes.comment });
+    await supabase.from('ticket_comments').insert([{
+      ticket_id: ticketId,
+      user_id: user.id || user._id,
+      message: changes.comment,
+    }]);
   }
 
-  await ticket.save();
-  return ticket;
+  // Handle status/priority updates
+  const updates = {};
+  if (changes.status) updates.status = changes.status;
+  if (changes.priority) updates.priority = changes.priority;
+
+  if (Object.keys(updates).length > 0) {
+    let q = supabase.from('tickets').update(updates).eq('id', ticketId);
+    if (user.role !== 'admin') {
+      q = q.eq('user_id', user.id || user._id);
+    }
+    const { error } = await q;
+    if (error) throw error;
+  }
+
+  return getTicket(user, ticketId);
 };
 
 const deleteTicket = async (ticketId) => {
-  const ticket = await Ticket.findByIdAndDelete(ticketId);
-  if (!ticket) {
-    const err = new Error('Ticket not found');
-    err.status = 404;
-    throw err;
-  }
+  const { error } = await supabase.from('tickets').delete().eq('id', ticketId);
+  if (error) throw error;
   return { deleted: ticketId };
 };
 

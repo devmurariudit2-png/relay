@@ -1,24 +1,34 @@
 const BaseService = require('../BaseService');
-// Models removed
+const supabase = require('../../config/supabase');
 const { AppError, Errors } = require('../../errors/AppError');
 
 class UpdateRoleService extends BaseService {
   async run() {
     const { targetUserId, role } = this.args;
-    
+
     if (String(targetUserId) === String(this.userId)) {
-      throw new AppError(Errors.BAD_REQUEST, { message: 'Cannot change your own role' });
+      throw new AppError(Errors.BAD_REQUEST, {
+        message: 'Cannot change your own role',
+      });
     }
 
-    const user = await User.findByIdAndUpdate(
-      targetUserId, { role }, { new: true, runValidators: true }
-    ).select('-password');
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role, updated_at: new Date().toISOString() })
+      .eq('id', targetUserId)
+      .select()
+      .single();
 
-    if (!user) {
+    if (error || !data) {
       throw new AppError(Errors.NOT_FOUND, { message: 'User not found' });
     }
-    
-    return { _id: user._id, name: user.name, email: user.email, role: user.role };
+
+    return {
+      _id: data.id,
+      name: data.full_name || data.email,
+      email: data.email,
+      role: data.role,
+    };
   }
 }
 
