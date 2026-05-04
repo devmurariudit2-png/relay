@@ -6,6 +6,7 @@ import * as API from "./api/index.js";
 import Spinner from "./components/ui/Spinner.jsx";
 import Landing from "./pages/Landing.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import AppShell from "./components/layout/AppShell.jsx";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
     // 1. Check initial session
@@ -23,7 +25,13 @@ export default function App() {
     });
 
     // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Don't treat this as a real login — keep user on reset page
+        setIsPasswordRecovery(true);
+        return;
+      }
+      setIsPasswordRecovery(false);
       setSession(session);
       if (!session) {
         setUser(null);
@@ -63,7 +71,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={!isAuth ? <Landing onEnter={() => navigate("/signin")} /> : <Navigate to="/app/dashboard" />} />
       <Route path="/signin" element={!isAuth ? <AuthPage onLogin={u => { setUser(u); navigate("/app/dashboard"); }} onBack={() => navigate("/")} /> : <Navigate to="/app/dashboard" />} />
-      <Route path="/app/*" element={isAuth ? <AppShell user={user} setUser={setUser} onLogout={handleLogout} /> : <Navigate to="/signin" />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/app/*" element={isAuth && !isPasswordRecovery ? <AppShell user={user} setUser={setUser} onLogout={handleLogout} /> : <Navigate to="/signin" />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
