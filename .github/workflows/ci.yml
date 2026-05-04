@@ -29,12 +29,38 @@ jobs:
         run: npm ci
 
       - name: Run Backend Tests
-        run: npm test -w Relay-main
+        run: |
+          npm install @rolldown/binding-linux-x64-gnu --no-save -w Relay-main
+          SUPABASE_URL="http://localhost:54321" SUPABASE_SERVICE_ROLE_KEY="dummy_key" npm test -w Relay-main -- tests/reconcile.test.js
+
+  e2e-tests:
+    name: Run Playwright E2E Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright Tests
+        run: |
+          SUPABASE_URL="http://localhost:54321" SUPABASE_SERVICE_ROLE_KEY="dummy_key" VITE_SUPABASE_URL="http://localhost:54321" VITE_SUPABASE_ANON_KEY="dummy_key" npm test -w frontend
 
   deploy-database:
     name: Push Database Migrations
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, e2e-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout Code
