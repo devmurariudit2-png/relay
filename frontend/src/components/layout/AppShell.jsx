@@ -26,6 +26,7 @@ const PageLoader = () => (
 export default function AppShell({ user, setUser, onLogout }) {
   const [toasts, setToasts] = useState([]);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const tab = location.pathname.split("/").pop();
 
@@ -40,10 +41,38 @@ export default function AppShell({ user, setUser, onLogout }) {
   const props = { user, toast };
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#FFFFFF" }}>
-      <Sidebar tab={tab} user={user} onLogout={handleLogout} loggingOut={loggingOut} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", height: "100%" }}>
+    <div className="flex h-screen overflow-hidden bg-white">
+      {/* Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-200 ease-in-out`}>
+        <Sidebar tab={tab} user={user} onLogout={handleLogout} loggingOut={loggingOut} onClose={() => setIsSidebarOpen(false)} />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
+        {/* Mobile Header */}
+        <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-100 bg-white">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-400 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">R</span>
+            </div>
+            <span className="font-bold text-gray-900">Relay</span>
+          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-auto h-full relative">
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Navigate to="dashboard" replace />} />

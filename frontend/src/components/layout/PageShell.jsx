@@ -1,14 +1,22 @@
 export default function PageShell({ title, sub, actions, children }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ padding: "24px 28px 20px", borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, flexWrap: "wrap", gap: "10px" }}>
+    <div className="flex flex-col h-full bg-[#F9FAFB]">
+      <div className="px-4 py-5 sm:px-8 sm:py-6 border-b border-gray-200 bg-white flex flex-col sm:flex-row sm:justify-between sm:items-center flex-shrink-0 gap-4">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.5px", color: "#111827" }}>{title}</h1>
-          {sub && <div style={{ fontSize: 13, color: "#9CA3AF", marginTop: 3 }}>{sub}</div>}
+          <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">{title}</h1>
+          {sub && <div className="text-xs sm:text-sm text-gray-400 mt-1 font-medium">{sub}</div>}
         </div>
-        {actions}
+        {actions && (
+          <div className="flex items-center gap-2">
+            {actions}
+          </div>
+        )}
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px 40px", background: "#F9FAFB" }}>{children}</div>
+      <div className="flex-1 overflow-y-auto p-4 sm:p-8 pb-12 sm:pb-16">
+        <div className="max-w-[1400px] mx-auto">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

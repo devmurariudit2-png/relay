@@ -103,29 +103,31 @@ export default function Transactions({ user, toast }) {
     <PageShell title="Transactions" sub={`${txMeta?.total || 0} total records`}
       actions={
         user?.role !== "viewer" && (
-          <div className="flex gap-3">
-            <button className="btn-ghost text-[13px]" onClick={() => setShowImport(true)}>↑ Import CSV</button>
-            <button className="btn-primary text-[13px]" onClick={() => setShowAdd(true)}>+ Add Transaction</button>
+          <div className="flex flex-col xs:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <button className="btn-ghost text-[12px] sm:text-[13px] py-2 px-3 flex-1" onClick={() => setShowImport(true)}>↑ Import CSV</button>
+            <button className="btn-primary text-[12px] sm:text-[13px] py-2 px-3 flex-1" onClick={() => setShowAdd(true)}>+ Add Transaction</button>
           </div>
         )
       }>
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-6 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-        {[
-          { key: "source", opts: ["", "bank", "internal"], labels: ["All Sources", "Bank", "Internal"] },
-          { key: "status", opts: ["", "pending", "matched", "unmatched", "exception", "duplicate"], labels: ["All Status", "Pending", "Matched", "Unmatched", "Exception", "Duplicate"] },
-        ].map(f => (
-          <select key={f.key} className="inp w-auto py-1.5 px-3 min-w-[140px]"
-            value={filter[f.key] || ""}
-            onChange={e => setFilter(p => ({ ...p, [f.key]: e.target.value || undefined }))}>
-            {f.opts.map((o, i) => <option key={o} value={o}>{f.labels[i]}</option>)}
-          </select>
-        ))}
-        <div className="flex-1 min-w-[220px]">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 mb-6 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "source", opts: ["", "bank", "internal"], labels: ["All Sources", "Bank", "Internal"] },
+            { key: "status", opts: ["", "pending", "matched", "unmatched", "exception", "duplicate"], labels: ["All Status", "Pending", "Matched", "Unmatched", "Exception", "Duplicate"] },
+          ].map(f => (
+            <select key={f.key} className="inp w-full sm:w-auto py-1.5 px-3 min-w-[140px]"
+              value={filter[f.key] || ""}
+              onChange={e => setFilter(p => ({ ...p, [f.key]: e.target.value || undefined }))}>
+              {f.opts.map((o, i) => <option key={o} value={o}>{f.labels[i]}</option>)}
+            </select>
+          ))}
+        </div>
+        <div className="flex-1">
           <input className="inp py-1.5 px-4" placeholder="Search description, reference…" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="text-[12px] font-bold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-wider"
+        <button className="text-[11px] font-bold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-wider whitespace-nowrap"
           onClick={() => { setFilter({}); setSearch(""); }}>Clear Filters</button>
       </div>
 
@@ -136,9 +138,9 @@ export default function Transactions({ user, toast }) {
               <tr className="bg-gray-50/50">
                 <th className="w-32">Date</th>
                 <th>Description</th>
-                <th className="w-32">Source</th>
-                <th className="w-32">Category</th>
-                <th className="w-32">Reference</th>
+                <th className="w-32 hide-mobile">Source</th>
+                <th className="w-32 hide-mobile">Category</th>
+                <th className="w-32 hide-mobile">Reference</th>
                 <th className="text-right w-40">Amount</th>
                 <th className="w-32">Status</th>
                 <th className="w-24 text-right">Actions</th>
@@ -176,11 +178,12 @@ export default function Transactions({ user, toast }) {
                   <tr key={t.id ?? t._id} className="group hover:bg-gray-50 transition-colors">
                     <td className="mono text-gray-500 text-[12px]">{t.date}</td>
                     <td className="font-semibold text-gray-900 max-w-[240px] truncate">{t.description}</td>
-                    <td><Tag label={t.source} /></td>
-                    <td className="text-gray-500 text-[13px]">{t.category || "—"}</td>
-                    <td className="mono text-gray-400 text-[11px]">{t.reference || "—"}</td>
+                    <td className="hide-mobile"><Tag label={t.source} /></td>
+                    <td className="text-gray-500 text-[13px] hide-mobile">{t.category || "—"}</td>
+                    <td className="mono text-gray-400 text-[11px] hide-mobile">{t.reference || "—"}</td>
                     <td className={`mono text-right font-bold tabular-nums ${t.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {t.currency} {t.amount?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="text-[10px] opacity-60 mr-1">{t.currency}</span>
+                      {t.amount?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td><Tag label={t.status} /></td>
                     <td className="text-right">
@@ -221,23 +224,23 @@ export default function Transactions({ user, toast }) {
 
       {showAdd && (
         <Modal title="New Transaction" onClose={() => setShowAdd(false)}>
-          <div className="grid gap-5">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div><label>Date</label><input className="inp" type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} /></div>
               <div><label>Currency</label><select className="inp" value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></div>
             </div>
             <div><label>Description</label><input className="inp" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="e.g. Stripe Payout" /></div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div><label>Amount</label><input className="inp font-bold" type="number" step="0.01" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="0.00" /></div>
               <div><label>Source</label><select className="inp" value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))}><option value="bank">Bank</option><option value="internal">Internal</option></select></div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div><label>Reference</label><input className="inp mono" value={form.reference} onChange={e => setForm(p => ({ ...p, reference: e.target.value }))} placeholder="REF-XXXX" /></div>
               <div><label>Category</label><input className="inp" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Sales" /></div>
             </div>
-            <div className="flex gap-3 pt-4">
-              <button className="btn-ghost flex-1 font-bold" onClick={() => setShowAdd(false)}>Cancel</button>
-              <button className="btn-primary flex-1 font-bold" onClick={handleAdd} disabled={saving}>{saving ? "Saving…" : "Create Transaction"}</button>
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <button className="btn-ghost flex-1 font-bold py-3" onClick={() => setShowAdd(false)}>Cancel</button>
+              <button className="btn-primary flex-1 font-bold py-3" onClick={handleAdd} disabled={saving}>{saving ? "Saving…" : "Create Transaction"}</button>
             </div>
           </div>
         </Modal>

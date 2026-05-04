@@ -105,52 +105,52 @@ export default function Landing({ onEnter }) {
       <div style={{ position: "fixed", top: 0, left: 0, zIndex: 2000, height: 2, width: `${pct}%`, background: "linear-gradient(90deg,#EF4444,#F87171)", transition: "width .1s" }} />
 
       {/* Nav */}
-      <nav style={{ position: "fixed", top: 2, left: 0, right: 0, zIndex: 100, height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6%", background: scrolled ? "rgba(255,255,255,.92)" : "transparent", backdropFilter: scrolled ? "blur(20px)" : "none", borderBottom: scrolled ? "1px solid #E5E7EB" : "none", transition: "all .35s", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 30, height: 30, background: "linear-gradient(135deg,#EF4444,#F87171)", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>R</span>
+      <nav className={`fixed top-0 left-0 right-0 z-[100] h-16 flex items-center justify-between px-[6%] transition-all duration-300 ${scrolled ? "bg-white/90 backdrop-blur-xl border-b border-gray-100" : "bg-transparent"}`}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-red-500 to-red-400 rounded-lg flex items-center justify-center shadow-lg shadow-red-500/20">
+            <span className="text-white font-extrabold text-sm sm:text-base">R</span>
           </div>
-          <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-.4px", color: "#111827" }}>Relay</span>
+          <span className="text-lg sm:text-xl font-bold tracking-tight text-gray-900">Relay</span>
         </div>
-        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-          <button style={{ background: "transparent", color: "#6B7280", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }} onClick={() => navigate("/app/api-docs")}>Docs</button>
-          <button style={{ background: "transparent", color: "#6B7280", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }} onClick={onEnter}>Sign in</button>
-          <button className="btn-primary" style={{ padding: "8px 18px", fontSize: 13 }} onClick={onEnter}>Get started</button>
+        <div className="flex gap-4 sm:gap-8 items-center">
+          <button className="hidden sm:block text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors" onClick={() => navigate("/app/api-docs")}>Docs</button>
+          <button className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors" onClick={onEnter}>Sign in</button>
+          <button className="btn-primary py-2 px-4 sm:px-6 text-xs sm:text-sm" onClick={onEnter}>Get started</button>
         </div>
       </nav>
 
       {/* Hero */}
-      <section style={{ minHeight: "92vh", display: "flex", alignItems: "center", padding: "100px 6% 60px", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(239,68,68,.04) 1px, transparent 1px)", backgroundSize: "40px 40px", maskImage: "radial-gradient(ellipse 70% 70% at 50% 40%, black 30%, transparent 100%)", pointerEvents: "none" }} />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 60, width: "100%", maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1, flexWrap: "wrap" }}>
+      <section className="min-h-screen flex items-center pt-24 sm:pt-32 pb-16 px-[6%] relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: "radial-gradient(#EF4444 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+        
+        <div className="max-w-[1200px] mx-auto w-full flex flex-col lg:flex-row items-center gap-12 lg:gap-20 z-10">
           {/* Left: copy */}
-          <div style={{ flex: "1 1 400px", minWidth: 0 }}>
-            <h1 className="fu1" style={{ fontSize: "clamp(36px,5vw,64px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-3px", marginBottom: 24, color: "#111827" }}>
+          <div className="flex-1 text-center lg:text-left">
+            <h1 className="fu1 text-[40px] sm:text-[60px] lg:text-[72px] font-black leading-[0.95] tracking-tight sm:tracking-tighter mb-6 text-gray-900">
               Bank ↔ Internal.<br />
-              <span style={{ background: "linear-gradient(135deg,#EF4444,#F87171)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Reconciled.</span>
+              <span className="bg-gradient-to-r from-red-600 to-red-400 bg-clip-text text-transparent">Reconciled.</span>
             </h1>
 
-            <p className="fu2" style={{ fontSize: 17, color: "#6B7280", lineHeight: 1.7, maxWidth: 480, marginBottom: 36, letterSpacing: "-.2px" }}>
+            <p className="fu2 text-base sm:text-lg lg:text-xl text-gray-500 leading-relaxed max-w-2xl lg:max-w-md mx-auto lg:mx-0 mb-10">
               The engine that matches thousands of transactions in seconds, flags every exception, and gives your finance team a single source of truth.
             </p>
 
-            <div className="fu3" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button className="btn-primary" style={{ padding: "14px 28px", fontSize: 15 }} onClick={onEnter}>Start reconciling today</button>
+            <div className="fu3 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+              <button className="btn-primary py-4 px-8 text-base shadow-xl shadow-red-500/20" onClick={onEnter}>Start reconciling today</button>
             </div>
 
-            <div className="fu4" style={{ display: "flex", gap: 32, marginTop: 44, paddingTop: 28, borderTop: "1px solid #E5E7EB", flexWrap: "wrap" }}>
-              {[["∞", "Transactions matched"], ["< 1s", "Reconciliation speed"], ["100%", "Audit trail coverage"]].map(([v, l]) => (
+            <div className="fu4 flex justify-center lg:justify-start gap-8 sm:gap-12 mt-12 pt-8 border-t border-gray-100">
+              {[["∞", "Matches"], ["< 1s", "Speed"], ["100%", "Audit"]].map(([v, l]) => (
                 <div key={l}>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#EF4444", letterSpacing: "-1px" }}>{v}</div>
-                  <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{l}</div>
+                  <div className="text-2xl sm:text-3xl font-black text-red-500 tracking-tighter">{v}</div>
+                  <div className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{l}</div>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Right: dashboard preview */}
-          <div className="fu2" style={{ flex: "1 1 400px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="fu2 flex-1 w-full max-w-[500px] lg:max-w-none">
             <HeroDashboardPreview />
           </div>
         </div>
