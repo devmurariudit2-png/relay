@@ -1,0 +1,18 @@
+{
+  "name": "relay-platform",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "Relay-main",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w Relay-main\" \"npm run dev -w frontend\"",
+    "start": "concurrently \"npm start -w Relay-main\" \"npm start -w frontend\"",
+    "test": "npm test -w Relay-main",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

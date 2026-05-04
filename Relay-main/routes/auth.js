@@ -7,10 +7,6 @@ const R = require('../utils/response');
 const {
   loginRules, registerRules, profileRules, passwordRules, validate
 } = require('../middleware/validate');
-const RegisterService = require('../services/auth/RegisterService');
-const LoginService = require('../services/auth/LoginService');
-const UpdateProfileService = require('../services/auth/UpdateProfileService');
-const ChangePasswordService = require('../services/auth/ChangePasswordService');
 
 
 
@@ -49,11 +45,8 @@ const ChangePasswordService = require('../services/auth/ChangePasswordService');
 router.post('/register',
   authLimiter,
   registerRules, validate,
-  async (req, res, next) => {
-    try {
-      const result = await RegisterService.execute(req.body, req.context);
-      return R.created(res, result);
-    } catch (err) { next(err); }
+  async (req, res) => {
+    return R.success(res, { message: 'Registration should be handled via Supabase Auth SDK on the frontend.' });
   }
 );
 

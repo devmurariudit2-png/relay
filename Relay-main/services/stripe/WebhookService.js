@@ -1,6 +1,6 @@
 const BaseService = require('../BaseService');
-const Subscription = require('../../models/Subscription');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
+const supabase = require('../../config/supabase');
 const { AppError, Errors } = require('../../errors/AppError');
 
 class WebhookService extends BaseService {
@@ -14,7 +14,6 @@ class WebhookService extends BaseService {
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
         try { 
-          // Fallback parsing for manual testing without raw webhook signature
           event = JSON.parse(rawBody); 
         } catch(e) { 
           throw new AppError(Errors.BAD_REQUEST, { message: `Webhook Error: ${err.message}` });
@@ -24,20 +23,36 @@ class WebhookService extends BaseService {
       }
     }
 
+    // 1. Immutable Audit Trail: Log every raw webhook event
+    try {
+      await supabase.from('stripe_events').insert([{
+        stripe_event_id: event.id,
+        type: event.type,
+        data: event,
+        processed: false
+      }]);
+    } catch (logErr) {
+      this.logger && this.logger.error('Failed to log stripe event', { error: logErr.message });
+    }
+
+    // 2. Process Event
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
         if (session.mode === 'subscription') {
-          const orgId = session.metadata.orgId;
+          const userId = session.metadata.userId;
           const tier = session.metadata.tier;
-          await Subscription.findOneAndUpdate(
-            { orgId },
-            { 
-              stripeSubscriptionId: session.subscription,
-              tier,
-              status: 'active'
-            }
-          );
+          
+          await supabase.from('subscriptions').upsert({
+            user_id: userId,
+            stripe_subscription_id: session.subscription,
+            stripe_customer_id: session.customer,
+            status: 'active',
+            plan_id: tier
+          }, { onConflict: 'user_id' });
+
+          // Update profile role if needed
+          await supabase.from('profiles').update({ role: tier === 'enterprise' ? 'admin' : 'member' }).eq('id', userId);
         }
         break;
       }
@@ -46,18 +61,18 @@ class WebhookService extends BaseService {
         const subscription = event.data.object;
         const customerId = subscription.customer;
         
-        await Subscription.findOneAndUpdate(
-          { stripeCustomerId: customerId },
-          { 
+        await supabase.from('subscriptions')
+          .update({ 
             status: subscription.status,
-            currentPeriodEnd: new Date(subscription.current_period_end * 1000)
-          }
-        );
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString()
+          })
+          .eq('stripe_customer_id', customerId);
         break;
       }
-      default:
-        this.logger && this.logger.info(`Unhandled event type ${event.type}`);
     }
+
+    // Mark as processed
+    await supabase.from('stripe_events').update({ processed: true }).eq('stripe_event_id', event.id);
 
     return { received: true };
   }

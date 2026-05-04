@@ -1,7 +1,7 @@
 const crypto = require('crypto');
-const User = require('../models/User');
 const logger = require('../utils/logger');
 const reconcileService = require('./reconcileService');
+const supabase = require('../config/supabase');
 
 const JOB_TYPES = {
   RECONCILE: 'RECONCILE',
@@ -93,15 +93,9 @@ const scheduleAutoReconcile = () => {
   const interval = minutes * 60 * 1000;
   setInterval(async () => {
     try {
-      let userIds = [];
-      if (process.env.SUPABASE_URL) {
-        const supabase = require('../config/supabase');
-        const { data } = await supabase.from('profiles').select('id').eq('active', true);
-        userIds = (data || []).map(u => u.id);
-      } else {
-        const users = await User.find({ active: true }).select('_id').lean();
-        userIds = users.map(u => u._id);
-      }
+      const { data } = await supabase.from('profiles').select('id').eq('active', true);
+      const userIds = (data || []).map(u => u.id);
+      
       userIds.forEach((id) => enqueueReconcile(id));
       logger.info('Auto-scheduled reconcile jobs enqueued', { count: userIds.length });
     } catch (err) {
