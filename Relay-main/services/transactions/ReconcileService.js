@@ -49,10 +49,14 @@ class ReconcileService extends BaseService {
     }
 
     // ── 4. Apply matched updates ──────────────────────────────────────────────
-    for (const u of updates) {
-      await Transaction.findByIdAndUpdate(u.id, {
-        $set: { status: u.status, matched_id: u.matched_id }
-      });
+    if (updates.length > 0) {
+      const ops = updates.map(u => ({
+        updateOne: {
+          filter: { _id: u.id },
+          update: { $set: { status: u.status, matched_id: u.matched_id } }
+        }
+      }));
+      await Transaction.bulkWrite(ops);
     }
 
     // ── 5. Detect duplicates — same source, same amount, same ref, within 1 day
