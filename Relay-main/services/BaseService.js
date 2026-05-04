@@ -81,7 +81,6 @@ class BaseService {
                         error.message?.includes("not connected");
 
       if ((process.env.DEMO_BYPASS === "true" || process.env.SUPABASE_URL) && isDbError) {
-        console.log(`[SERVICE FAILOVER] DB Unavailable or Supabase Mode. ${serviceName} is running via SQL handler.`);
         return handleSupabaseRequest(serviceName, args, context);
       }
 
