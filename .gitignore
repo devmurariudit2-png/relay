@@ -9,3 +9,6 @@ coverage/
 .vercel/
 
 .vercel
+
+# Prevent legacy code from being tracked
+Relay-Front-master/

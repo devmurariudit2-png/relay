@@ -2,7 +2,6 @@ const router = require('express').Router();
 const { protect, adminOnly } = require('../middleware/supabaseAuth');
 const audit = require('../middleware/audit');
 const R = require('../utils/response');
-const teamService = require('../services/teamService');
 const { inviteRules, roleUpdateRules, mongoIdParam, validate } = require('../middleware/validate');
 const GetTeamService = require('../services/team/GetTeamService');
 const InviteMemberService = require('../services/team/InviteMemberService');

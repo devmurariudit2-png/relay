@@ -76,9 +76,9 @@ class BaseService {
       // ✅ AUTOMATIC FAILOVER TO SUPABASE/FALLBACK HANDLER
       const isDbError = error.name === "MongoError" || 
                         error.name === "MongooseError" || 
-                        error.message.includes("buffering timed out") || 
-                        error.message.includes("selection timeout") ||
-                        error.message.includes("not connected");
+                        error.message?.includes("buffering timed out") || 
+                        error.message?.includes("selection timeout") ||
+                        error.message?.includes("not connected");
 
       if ((process.env.DEMO_BYPASS === "true" || process.env.SUPABASE_URL) && isDbError) {
         console.log(`[SERVICE FAILOVER] DB Unavailable or Supabase Mode. ${serviceName} is running via SQL handler.`);
