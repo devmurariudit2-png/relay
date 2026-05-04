@@ -52,10 +52,30 @@ class ReconcileService extends BaseService {
     }
 
     // ── 4. Pass 2 — exact amount + date within 3 days ──────────────────────────
+    // ⚡ Bolt Optimization: Group unmatched internal transactions by amount for O(N) lookup
+    const internalByAmount = new Map();
+    for (const i of internal) {
+      if (usedI.has(i.id)) continue;
+      const amtKey = Math.round(i.amount * 100);
+      if (!internalByAmount.has(amtKey)) internalByAmount.set(amtKey, []);
+      internalByAmount.get(amtKey).push(i);
+    }
+
     for (const b of bank) {
       if (usedB.has(b.id)) continue;
+
+      const amtKey = Math.round(b.amount * 100);
+      // Look up candidates with exact or near exact amount (+/- 1 cent to account for float inaccuracy)
+      const candidates = [
+        ...(internalByAmount.get(amtKey) || []),
+        ...(internalByAmount.get(amtKey - 1) || []),
+        ...(internalByAmount.get(amtKey + 1) || [])
+      ];
+
+      if (candidates.length === 0) continue;
+
       const bd = new Date(b.date).getTime();
-      for (const i of internal) {
+      for (const i of candidates) {
         if (usedI.has(i.id)) continue;
         const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
         if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
