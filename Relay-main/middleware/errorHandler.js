@@ -15,24 +15,23 @@ const errorHandler = (err, req, res, next) => {
     ip:      req.ip,
   });
 
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map(e => ({ field: e.path, message: e.message }));
-    return res.status(400).json({ success: false, message: 'Validation error', errors });
+  // Supabase / Postgres error mapping
+  if (err.code && typeof err.code === 'string' && err.code.length === 5) {
+    // Unique violation
+    if (err.code === '23505') {
+      return res.status(400).json({ success: false, message: 'Record already exists', detail: err.detail });
+    }
+    // Foreign key violation
+    if (err.code === '23503') {
+      return res.status(400).json({ success: false, message: 'Reference error: related record not found' });
+    }
+    // Invalid UUID / type
+    if (err.code === '22P02') {
+      return res.status(400).json({ success: false, message: 'Invalid data format (ID or UUID)' });
+    }
   }
 
-  // Mongoose cast error (bad ObjectId)
-  if (err.name === 'CastError') {
-    return res.status(400).json({ success: false, message: `Invalid ${err.path}: ${err.value}` });
-  }
-
-  // MongoDB duplicate key
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue || {})[0] || 'field';
-    return res.status(400).json({ success: false, message: `${field} already exists` });
-  }
-
-  // JWT errors (should be caught in auth middleware, but just in case)
+  // JWT errors
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({ success: false, message: 'Invalid token' });
   }
@@ -49,7 +48,13 @@ const errorHandler = (err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
   const message    = (statusCode < 500 ? err.message : null) || 'Internal server error';
 
-  res.status(statusCode).json({ success: false, message });
+  res.status(statusCode).json({
+    success: false,
+    message,
+    traceId: req.context?.traceId,
+    // Include error code in dev for easier debugging
+    code: process.env.NODE_ENV !== 'production' ? err.code : undefined
+  });
 };
 
 /** 404 handler — register before errorHandler */

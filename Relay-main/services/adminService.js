@@ -23,9 +23,11 @@ const listUsers = async (query) => {
   const { data: users, count, error } = await q.order('created_at', { ascending: false }).range(from, to);
   if (error) throw error;
 
-  const withStats = await Promise.all((users || []).map(async (u) => {
-    const { count: txCount } = await supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', u.id);
-    return { ...u, _id: u.id, txCount, lastActivity: u.created_at };
+  const withStats = (users || []).map(u => ({
+    ...u,
+    _id: u.id,
+    txCount: u.tx_count || 0,
+    lastActivity: u.created_at
   }));
 
   return { users: withStats, page, limit, total: count };
@@ -37,11 +39,10 @@ const getUserDetails = async (userId) => {
   const { data: user, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
   if (error) throw error;
 
-  const { count: txCount } = await supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', userId);
   const { count: matched } = await supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'matched');
   const { data: tickets } = await supabase.from('tickets').select('id, title, status, created_at').eq('user_id', userId);
 
-  return { ...user, _id: user.id, txCount, matched, tickets: (tickets || []).map(t => ({ ...t, _id: t.id })) };
+  return { ...user, _id: user.id, txCount: user.tx_count || 0, matched, tickets: (tickets || []).map(t => ({ ...t, _id: t.id })) };
 };
 
 const updateUser = async (userId, changes) => {
@@ -69,13 +70,24 @@ const analytics = async () => {
     throw new Error('Supabase not configured');
   }
 
-  const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-  const { count: totalTx } = await supabase.from('transactions').select('*', { count: 'exact', head: true });
-  const { count: matched } = await supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'matched');
-  const { count: unmatched } = await supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'unmatched');
-  const { count: exceptions } = await supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'exception');
-  const { count: totalTickets } = await supabase.from('tickets').select('*', { count: 'exact', head: true });
-  const { count: openTickets } = await supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'open');
+  // Fetch all counts in parallel to heavily reduce latency
+  const [
+    { count: totalUsers },
+    { count: totalTx },
+    { count: matched },
+    { count: unmatched },
+    { count: exceptions },
+    { count: totalTickets },
+    { count: openTickets }
+  ] = await Promise.all([
+    supabase.from('profiles').select('*', { count: 'exact', head: true }),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'matched'),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'unmatched'),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'exception'),
+    supabase.from('tickets').select('*', { count: 'exact', head: true }),
+    supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'open')
+  ]);
 
   return {
     overview: {

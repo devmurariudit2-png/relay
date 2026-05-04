@@ -49,3 +49,8 @@ INSERT INTO public.tickets (user_id, title, description, status, priority) VALUE
   ('00000000-0000-0000-0000-000000000001', 'Review Unmatched Transactions', 'There are 15 new unmatched ledger entries from the weekend batch.', 'open', 'high'),
   ('00000000-0000-0000-0000-000000000001', 'Update Webhook Secrets', 'Rotate the Stripe webhook secrets before moving to production.', 'resolved', 'medium')
 ON CONFLICT DO NOTHING;
+
+-- 5. Performance Indexes
+-- Speeds up the subscription transaction limit check in CreateTransactionService
+CREATE INDEX IF NOT EXISTS idx_transactions_user_created 
+ON public.transactions(user_id, created_at);

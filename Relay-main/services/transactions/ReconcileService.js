@@ -68,16 +68,18 @@ class ReconcileService extends BaseService {
       }
     }
 
-    // ── 5. Apply matched updates in batches ────────────────────────────────────
-    // Note: Supabase doesn't have a bulk update for different rows easily via client, 
-    // but we can at least do it in small chunks or use a single query if we had an RPC.
-    // For now, we use Promise.all to parallelize, but limited to avoid rate limits.
-    const batchSize = 10;
-    for (let i = 0; i < updates.length; i += batchSize) {
-      const batch = updates.slice(i, i + batchSize);
-      await Promise.all(batch.map(u => 
-        supabase.from('transactions').update({ status: u.status, matched_id: u.matched_id }).eq('id', u.id)
-      ));
+    // ── 5. Apply matched updates in a single bulk operation ───────────────────
+    if (updates.length > 0) {
+      const { error: updateError } = await supabase
+        .from('transactions')
+        .upsert(updates.map(u => ({ 
+          id: u.id, 
+          status: u.status, 
+          matched_id: u.matched_id,
+          user_id: userId // Required for RLS or index matching usually
+        })));
+      
+      if (updateError) throw updateError;
     }
 
     // ── 6. Detect duplicates ───────────────────────────────────────────────────

@@ -41,28 +41,8 @@ class BaseService {
 
     try {
       const instance = new this(args, context);
-
-      // ✅ PREFER CUSTOM SERVICE IMPLEMENTATION OVER MONOLITHIC HANDLER
-      if (instance.run !== BaseService.prototype.run) {
-        const result = await instance.run();
-        
-        if (context && context.logger) {
-          context.logger.info(`[${serviceName}] Completed`, {
-            traceId: context.traceId,
-            duration: `${Date.now() - startTime}ms`,
-            result: sanitizeResult(result),
-          });
-        }
-        return result;
-      }
-
-      // Fallback to monolithic Supabase handler for legacy support during migration
-      if (process.env.SUPABASE_URL) {
-        return await handleSupabaseRequest(serviceName, args, context);
-      }
-
       const result = await instance.run();
-
+      
       if (context && context.logger) {
         context.logger.info(`[${serviceName}] Completed`, {
           traceId: context.traceId,
@@ -70,21 +50,8 @@ class BaseService {
           result: sanitizeResult(result),
         });
       }
-
       return result;
     } catch (error) {
-      // ✅ AUTOMATIC FAILOVER TO SUPABASE/FALLBACK HANDLER
-      const isDbError = error.name === "MongoError" || 
-                        error.name === "MongooseError" || 
-                        error.message?.includes("buffering timed out") || 
-                        error.message?.includes("selection timeout") ||
-                        error.message?.includes("not connected");
-
-      if ((process.env.DEMO_BYPASS === "true" || process.env.SUPABASE_URL) && isDbError) {
-        console.log(`[SERVICE FAILOVER] DB Unavailable or Supabase Mode. ${serviceName} is running via SQL handler.`);
-        return handleSupabaseRequest(serviceName, args, context);
-      }
-
       if (context && context.logger) {
         context.logger.error(`[${serviceName}] Failed`, {
           traceId: context.traceId,
@@ -140,194 +107,6 @@ function sanitizeResult(result) {
     }
   }
   return summary;
-}
-
-const supabase = require('../config/supabase');
-
-async function handleSupabaseRequest(serviceName, args, context) {
-  const now = new Date().toISOString();
-  const userId = context.user ? (context.user.id || context.user._id) : null;
-  
-  const mapId = (obj) => {
-    if (!obj) return obj;
-    if (Array.isArray(obj)) return obj.map(o => ({ ...o, _id: o.id, name: o.full_name, createdAt: o.created_at }));
-    return { ...obj, _id: obj.id, name: obj.full_name, createdAt: obj.created_at };
-  };
-
-  // ── Transactions ────────────────────────────────────────────────────────────
-  if (serviceName.includes('Reconcile')) {
-    // 1. Reset all user transactions to pending
-    await supabase.from('transactions').update({ status: 'pending', matched_id: null }).eq('user_id', userId);
-
-    // 2. Fetch all transactions
-    const { data: allTx } = await supabase.from('transactions').select('*').eq('user_id', userId);
-    if (!allTx || allTx.length === 0) {
-      return { matched: 0, unmatched: 0, duplicates: 0, exceptions: 0, total: 0, bank_total: 0, internal_total: 0, variance: 0, status: 'BALANCED', unmatched_bank: 0, unmatched_internal: 0 };
-    }
-
-    const bank = allTx.filter(t => t.source === 'bank');
-    const internal = allTx.filter(t => t.source === 'internal');
-    const usedB = new Set();
-    const usedI = new Set();
-    const updates = []; // { id, status, matched_id }
-
-    // 3. Pass 1 — exact reference + exact amount
-    const internalByRef = new Map();
-    for (const i of internal) {
-      if (!i.reference) continue;
-      if (!internalByRef.has(i.reference)) internalByRef.set(i.reference, []);
-      internalByRef.get(i.reference).push(i);
-    }
-    for (const b of bank) {
-      if (!b.reference || usedB.has(b.id)) continue;
-      const candidates = internalByRef.get(b.reference);
-      if (!candidates) continue;
-      for (const i of candidates) {
-        if (usedI.has(i.id)) continue;
-        if (Math.abs(i.amount - b.amount) < 0.01) {
-          updates.push({ id: b.id, status: 'matched', matched_id: i.id });
-          updates.push({ id: i.id, status: 'matched', matched_id: b.id });
-          usedB.add(b.id);
-          usedI.add(i.id);
-          break;
-        }
-      }
-    }
-
-    // 4. Pass 2 — exact amount + date within 3 days
-    for (const b of bank) {
-      if (usedB.has(b.id)) continue;
-      const bd = new Date(b.date).getTime();
-      for (const i of internal) {
-        if (usedI.has(i.id)) continue;
-        const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
-        if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
-          updates.push({ id: b.id, status: 'matched', matched_id: i.id });
-          updates.push({ id: i.id, status: 'matched', matched_id: b.id });
-          usedB.add(b.id);
-          usedI.add(i.id);
-          break;
-        }
-      }
-    }
-
-    // 5. Apply matched updates
-    for (const u of updates) {
-      await supabase.from('transactions').update({ status: u.status, matched_id: u.matched_id }).eq('id', u.id);
-    }
-
-    // 6. Detect duplicates — same source, same amount, same ref, within 1 day
-    const pending = allTx.filter(t => !usedB.has(t.id) && !usedI.has(t.id));
-    const duplicateIds = new Set();
-    const dupMap = new Map();
-    for (const t of pending) {
-      const key = `${t.source}_${Math.round(t.amount * 100)}_${t.reference || ''}`;
-      if (!dupMap.has(key)) {
-        dupMap.set(key, [t]);
-      } else {
-        const existing = dupMap.get(key);
-        for (const e of existing) {
-          if (Math.abs(new Date(t.date).getTime() - new Date(e.date).getTime()) / 86400000 <= 1) {
-            duplicateIds.add(t.id);
-            break;
-          }
-        }
-        existing.push(t);
-      }
-    }
-    for (const id of duplicateIds) {
-      await supabase.from('transactions').update({ status: 'duplicate' }).eq('id', id);
-    }
-
-    // 7. Flag exceptions — large unmatched (>= 10,000)
-    const THRESHOLD = 10000;
-    const exceptionIds = pending.filter(t => !duplicateIds.has(t.id) && Math.abs(t.amount) >= THRESHOLD).map(t => t.id);
-    for (const id of exceptionIds) {
-      await supabase.from('transactions').update({ status: 'exception' }).eq('id', id);
-    }
-
-    // 8. Everything else → unmatched
-    const unmatchedIds = pending.filter(t => !duplicateIds.has(t.id) && !exceptionIds.includes(t.id)).map(t => t.id);
-    for (const id of unmatchedIds) {
-      await supabase.from('transactions').update({ status: 'unmatched' }).eq('id', id);
-    }
-
-    // 9. Build summary
-    const { data: final } = await supabase.from('transactions').select('*').eq('user_id', userId);
-    const bankTxs = final.filter(t => t.source === 'bank');
-    const intTxs = final.filter(t => t.source === 'internal');
-    const bankTotal = Math.round(bankTxs.reduce((s, t) => s + t.amount, 0) * 100) / 100;
-    const internalTotal = Math.round(intTxs.reduce((s, t) => s + t.amount, 0) * 100) / 100;
-    const variance = Math.round((bankTotal - internalTotal) * 100) / 100;
-    const count = (st) => final.filter(t => t.status === st).length;
-
-    return {
-      matched: count('matched'),
-      unmatched: count('unmatched'),
-      duplicates: count('duplicate'),
-      exceptions: count('exception'),
-      total: final.length,
-      bank_total: bankTotal,
-      internal_total: internalTotal,
-      variance,
-      status: variance === 0 ? 'BALANCED' : 'VARIANCE DETECTED',
-      unmatched_bank: bankTxs.filter(t => t.status === 'unmatched').length,
-      unmatched_internal: intTxs.filter(t => t.status === 'unmatched').length,
-    };
-  }
-
-  // ── Team ────────────────────────────────────────────────────────────────────
-  if (serviceName.includes('GetTeam')) {
-    let query = supabase.from('profiles').select('*');
-    
-    // Filter by organization if the user has one
-    const userOrg = context.user?.org_name;
-    if (userOrg && context.user?.role !== 'admin') {
-      query = query.eq('org_name', userOrg);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return mapId(data);
-  }
-
-  if (serviceName.includes('UpdateRole')) {
-    const { targetUserId, role } = args;
-    const { data, error } = await supabase.from('profiles').update({ role }).eq('id', targetUserId).select().single();
-    if (error) throw error;
-    return mapId(data);
-  }
-
-  if (serviceName.includes('RemoveMember')) {
-    const { targetUserId } = args;
-    const { error } = await supabase.auth.admin.deleteUser(targetUserId);
-    if (error) throw error;
-    return { deleted: targetUserId };
-  }
-  
-  if (serviceName.includes('InviteMember')) {
-    const { data, error } = await supabase.from('profiles').insert([{
-      email: args.email,
-      role: args.role,
-      active: true
-    }]).select().single();
-    if (error) throw error;
-    return mapId(data);
-  }
-
-  if (serviceName.includes('UpdateRole')) {
-    const { data, error } = await supabase.from('profiles').update({ role: args.role }).eq('id', args.targetUserId).select().single();
-    if (error) throw error;
-    return mapId(data);
-  }
-
-  if (serviceName.includes('RemoveMember')) {
-    const { error } = await supabase.from('profiles').delete().eq('id', args.targetUserId);
-    if (error) throw error;
-    return { success: true };
-  }
-
-  return { success: true, message: 'Supabase processed' };
 }
 
 module.exports = BaseService;

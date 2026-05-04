@@ -11,6 +11,41 @@ class JobService {
     this.jobs = new Map(); // Store job tracking data in memory
     this.pollingIntervals = new Map(); // Store polling interval IDs
     this.maxPollingDuration = 30 * 60 * 1000; // 30 minutes max polling
+    this._loadState(); // Restore jobs after page refresh
+  }
+
+  /**
+   * Persist active jobs to session storage so they survive page reloads
+   */
+  _saveState() {
+    try {
+      // Remove non-serializable callbacks before saving
+      const serializableJobs = Array.from(this.jobs.entries()).map(([id, job]) => [
+        id,
+        { ...job, callbacks: undefined }
+      ]);
+      sessionStorage.setItem('relay_active_jobs', JSON.stringify(serializableJobs));
+    } catch (e) {
+      console.warn('[JobService] Failed to save state to sessionStorage', e);
+    }
+  }
+
+  /**
+   * Load jobs from previous session and automatically resume polling
+   */
+  _loadState() {
+    try {
+      const saved = sessionStorage.getItem('relay_active_jobs');
+      if (saved) {
+        const parsedJobs = JSON.parse(saved);
+        parsedJobs.forEach(([id, job]) => {
+          job.callbacks = { onProgress: null, onComplete: null, onError: null };
+          this.jobs.set(id, job);
+        });
+      }
+    } catch (e) {
+      console.warn('[JobService] Failed to load state from sessionStorage', e);
+    }
   }
 
   /**
@@ -20,7 +55,7 @@ class JobService {
     try {
       // Call the reconcile endpoint which returns jobId (if async) or direct results
       const response = await API.reconcile();
-      
+
       if (response.jobId) {
         // Async mode - job enqueued, start polling
         const job = {
@@ -37,10 +72,11 @@ class JobService {
             onError: null
           }
         };
-        
+
         this.jobs.set(response.jobId, job);
+        this._saveState();
         console.log('[JobService] Started reconciliation job:', response.jobId);
-        
+
         return {
           jobId: response.jobId,
           status: 'pending',
@@ -71,7 +107,7 @@ class JobService {
       }
 
       const job = this.jobs.get(jobId);
-      
+
       // Set callbacks
       if (onProgress) job.callbacks.onProgress = onProgress;
       if (onComplete) job.callbacks.onComplete = onComplete;
@@ -115,10 +151,10 @@ class JobService {
       try {
         // Call backend to get status
         const statusResponse = await this.fetchJobStatus(jobId);
-        
+
         job.status = statusResponse.status;
         job.progress = statusResponse.progress || 0;
-        
+
         // Call progress callback
         if (job.callbacks.onProgress) {
           job.callbacks.onProgress({
@@ -133,6 +169,7 @@ class JobService {
         if (['completed', 'failed', 'cancelled'].includes(job.status)) {
           clearInterval(interval);
           this.pollingIntervals.delete(jobId);
+          this._saveState(); // Update storage once finished
 
           if (job.status === 'completed') {
             job.result = statusResponse.data;
@@ -222,6 +259,7 @@ class JobService {
   clearJob(jobId) {
     this.cancelPolling(jobId);
     this.jobs.delete(jobId);
+    this._saveState();
   }
 
   /**
@@ -231,8 +269,9 @@ class JobService {
     const completedJobs = Array.from(this.jobs.entries())
       .filter(([_, job]) => ['completed', 'failed', 'cancelled'].includes(job.status))
       .map(([jobId]) => jobId);
-    
+
     completedJobs.forEach(jobId => this.clearJob(jobId));
+    this._saveState();
     return completedJobs.length;
   }
 
