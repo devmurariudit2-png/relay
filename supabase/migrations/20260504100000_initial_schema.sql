@@ -138,60 +138,77 @@ CREATE TRIGGER on_auth_user_created
 -- ── RLS POLICIES ─────────────────────────────────────────────────────────────
 
 -- 1. Profiles Policies
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile" ON public.profiles
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
 CREATE POLICY "Admins can view all profiles" ON public.profiles
   FOR SELECT USING (public.is_admin());
 
 -- 2. Transactions Policies
+DROP POLICY IF EXISTS "Users can view their own transactions" ON public.transactions;
 CREATE POLICY "Users can view their own transactions" ON public.transactions
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own transactions" ON public.transactions;
 CREATE POLICY "Users can insert their own transactions" ON public.transactions
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own transactions" ON public.transactions;
 CREATE POLICY "Users can update their own transactions" ON public.transactions
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own transactions" ON public.transactions;
 CREATE POLICY "Users can delete their own transactions" ON public.transactions
   FOR DELETE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can manage all transactions" ON public.transactions;
 CREATE POLICY "Admins can manage all transactions" ON public.transactions
   FOR ALL USING (public.is_admin());
 
 -- 3. Audit Logs Policies
+DROP POLICY IF EXISTS "Users can view their own audit logs" ON public.audit_logs;
 CREATE POLICY "Users can view their own audit logs" ON public.audit_logs
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can view all audit logs" ON public.audit_logs;
 CREATE POLICY "Admins can view all audit logs" ON public.audit_logs
   FOR SELECT USING (public.is_admin());
 
 -- 4. Tickets Policies
+DROP POLICY IF EXISTS "Users can view their own tickets" ON public.tickets;
 CREATE POLICY "Users can view their own tickets" ON public.tickets
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create their own tickets" ON public.tickets;
 CREATE POLICY "Users can create their own tickets" ON public.tickets
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own tickets" ON public.tickets;
 CREATE POLICY "Users can update their own tickets" ON public.tickets
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can manage all tickets" ON public.tickets;
 CREATE POLICY "Admins can manage all tickets" ON public.tickets
   FOR ALL USING (public.is_admin());
 
 -- 5. Subscriptions Policies
+DROP POLICY IF EXISTS "Users can view their own subscription" ON public.subscriptions;
 CREATE POLICY "Users can view their own subscription" ON public.subscriptions
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can view all subscriptions" ON public.subscriptions;
 CREATE POLICY "Admins can view all subscriptions" ON public.subscriptions
   FOR SELECT USING (public.is_admin());
 
 -- 6. Stripe Events Policies (Admin Only)
 ALTER TABLE public.stripe_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins can view stripe events" ON public.stripe_events;
 CREATE POLICY "Admins can view stripe events" ON public.stripe_events
   FOR SELECT USING (public.is_admin());
 
