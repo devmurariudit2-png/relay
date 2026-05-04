@@ -8,12 +8,19 @@ import Spark from "../components/ui/Spark.jsx";
 import { fmt } from "../utils/format.js";
 
 export default function Dashboard({ user }) {
-  const { data: summary, isLoading: sumLoading } = useQuery({ queryKey: ['summary'], queryFn: API.getSummary });
+  const { data: summary, isLoading: sumLoading } = useQuery({
+    queryKey: ['summary'],
+    queryFn: API.getSummary,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ['analytics'],
     queryFn: API.getAdminAnalytics,
     enabled: user?.role === "admin",
-    retry: false
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: false,
   });
 
   const loading = sumLoading || (user?.role === "admin" && analyticsLoading);

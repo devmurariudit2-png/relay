@@ -36,6 +36,7 @@ export default function Transactions({ user, toast }) {
   const load = () => {
     queryClient.invalidateQueries({ queryKey: ['transactions'] });
     queryClient.invalidateQueries({ queryKey: ['summary'] });
+    queryClient.invalidateQueries({ queryKey: ['analytics'] });
   };
 
   const handleAdd = async () => {
@@ -68,10 +69,10 @@ export default function Transactions({ user, toast }) {
   };
 
   const handleUpdate = async () => {
-    if (!editingTx?._id) return;
+    if (!editingTx?.id) return;
     setSaving(true);
     try {
-      await API.updateTransaction(editingTx._id, { category: editForm.category, note: editForm.note });
+      await API.updateTransaction(editingTx.id, { category: editForm.category, note: editForm.note });
       toast("Transaction updated");
       setEditingTx(null);
       load();
@@ -172,7 +173,7 @@ export default function Transactions({ user, toast }) {
                 </tr>
               ) : (
                 txs.map(t => (
-                  <tr key={t._id} className="group hover:bg-gray-50 transition-colors">
+                  <tr key={t.id ?? t._id} className="group hover:bg-gray-50 transition-colors">
                     <td className="mono text-gray-500 text-[12px]">{t.date}</td>
                     <td className="font-semibold text-gray-900 max-w-[240px] truncate">{t.description}</td>
                     <td><Tag label={t.source} /></td>
@@ -189,7 +190,7 @@ export default function Transactions({ user, toast }) {
                             <button className="text-gray-400 hover:text-gray-900 p-1" onClick={() => openEdit(t)}>
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                             </button>
-                            <button className="text-gray-400 hover:text-red-600 p-1" onClick={() => handleDelete(t._id)}>
+                            <button className="text-gray-400 hover:text-red-600 p-1" onClick={() => handleDelete(t.id ?? t._id)}>
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
                           </>

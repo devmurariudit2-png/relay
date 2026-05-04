@@ -20,7 +20,9 @@ export default function Tickets({ user, toast }) {
     queryFn: () => API.getTickets({ limit: 50 })
   });
 
-  if (error) { toast(error.message, "error"); }
+  useEffect(() => {
+    if (error) toast(error.message, "error");
+  }, [error, toast]);
 
   const tickets = r?.data || r || [];
 
@@ -29,11 +31,12 @@ export default function Tickets({ user, toast }) {
   useEffect(() => {
     const channel = supabase
       .channel('tickets-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => {
-        load(); 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+        load();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const create = async () => {
@@ -47,14 +50,14 @@ export default function Tickets({ user, toast }) {
     if (!comment.trim()) return;
     setSaving(true);
     try {
-      const updated = await API.updateTicket(selected._id, { comment });
+      const updated = await API.updateTicket(selected.id ?? selected._id, { comment });
       setSelected(updated); setComment(""); toast("Comment added");
     } catch (e) { toast(e.message, "error"); }
     finally { setSaving(false); }
   };
 
   const changeStatus = async (id, status) => {
-    try { await API.updateTicket(id, { status }); toast("Status updated"); load(); if (selected?._id === id) setSelected(t => ({ ...t, status })); }
+    try { await API.updateTicket(id, { status }); toast("Status updated"); load(); if ((selected?.id ?? selected?._id) === id) setSelected(t => ({ ...t, status })); }
     catch (e) { toast(e.message, "error"); }
   };
 
@@ -63,7 +66,7 @@ export default function Tickets({ user, toast }) {
     try {
       await API.deleteTicket(id);
       toast("Ticket deleted");
-      if (selected?._id === id) setSelected(null);
+      if ((selected?.id ?? selected?._id) === id) setSelected(null);
       load();
     } catch (e) {
       toast(e.message, "error");
@@ -113,7 +116,7 @@ export default function Tickets({ user, toast }) {
                 </tr>
               ) : (
                 tickets.map(t => (
-                  <tr key={t._id} className="group hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelected(t)}>
+                  <tr key={t.id ?? t._id} className="group hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelected(t)}>
                     <td className="font-semibold text-gray-900">{t.title}</td>
                     <td><Tag label={t.priority} /></td>
                     <td className="text-gray-500 text-[13px]">{t.category || "—"}</td>
@@ -123,12 +126,12 @@ export default function Tickets({ user, toast }) {
                       <div className="flex gap-3 justify-end items-center opacity-0 group-hover:opacity-100 transition-opacity">
                         {user?.role === "admin" && (
                           <select className="inp py-1 px-2 text-[11px] w-auto bg-white"
-                            value={t.status} onChange={e => changeStatus(t._id, e.target.value)}>
+                            value={t.status} onChange={e => changeStatus(t.id ?? t._id, e.target.value)}>
                             {["open","in-progress","resolved","closed"].map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         )}
                         {user?.role === "admin" && (
-                          <button className="text-gray-400 hover:text-red-600 p-1" onClick={() => removeTicket(t._id)}>
+                          <button className="text-gray-400 hover:text-red-600 p-1" onClick={() => removeTicket(t.id ?? t._id)}>
                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                           </button>
                         )}      

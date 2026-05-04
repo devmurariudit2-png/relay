@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Card from "../components/ui/Card.jsx";
 import Tag from "../components/ui/Tag.jsx";
+import Metric from "../components/ui/Metric.jsx";
+import Spinner from "../components/ui/Spinner.jsx";
 
 export default function Ledger({ toast }) {
   const [source, setSource] = useState("bank");
@@ -13,7 +15,14 @@ export default function Ledger({ toast }) {
     queryFn: () => API.getLedger(source)
   });
 
-  if (error) { toast(error.message, "error"); }
+  if (error) { toast?.(error.message, "error"); }
+
+  const stats = useMemo(() => {
+    const debit = rows.reduce((acc, r) => acc + (r.debit || 0), 0);
+    const credit = rows.reduce((acc, r) => acc + (r.credit || 0), 0);
+    const balance = rows[rows.length - 1]?.balance || 0;
+    return { debit, credit, balance };
+  }, [rows]);
 
   const downloadFile = (name, content, type) => {
     const blob = new Blob([content], { type });
@@ -25,41 +34,6 @@ export default function Ledger({ toast }) {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  };
-
-  const buildSimplePdf = (rawText) => {
-    const escapePdfText = (value) => value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-    const lines = rawText.split("\n");
-    const textOps = lines
-      .map((line, i) => {
-        const y = 780 - i * 16;
-        return `BT /F1 12 Tf 50 ${y} Td (${escapePdfText(line)}) Tj ET`;
-      })
-      .join("\n");
-    const stream = `${textOps}\n`;
-
-    const objects = [
-      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
-      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
-      "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj",
-      "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
-      `5 0 obj << /Length ${stream.length} >> stream\n${stream}endstream endobj`,
-    ];
-
-    let pdf = "%PDF-1.4\n";
-    const offsets = [0];
-    objects.forEach((obj) => {
-      offsets.push(pdf.length);
-      pdf += `${obj}\n`;
-    });
-    const xrefStart = pdf.length;
-    pdf += `xref\n0 ${objects.length + 1}\n`;
-    pdf += "0000000000 65535 f \n";
-    offsets.slice(1).forEach((off) => {
-      pdf += `${String(off).padStart(10, "0")} 00000 n \n`;
-    });
-    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-    return new TextEncoder().encode(pdf);
   };
 
   const exportCSV = () => {
@@ -81,92 +55,87 @@ export default function Ledger({ toast }) {
     downloadFile(`ledger-${source}-${new Date().toISOString().slice(0, 10)}.csv`, csvContent, "text/csv;charset=utf-8");
   };
 
-  const exportPDF = () => {
-    if (!rows.length) return;
-    const text = [
-      `LEDGER REPORT - ${source.toUpperCase()}`,
-      "===========================",
-      ...rows.map(r => `${r.date} | ${r.description.slice(0, 20)} | Bal: ${r.balance}`)
-    ].join("\n");
-    const pdfBytes = buildSimplePdf(text);
-    downloadFile(`ledger-${source}-${new Date().toISOString().slice(0, 10)}.pdf`, pdfBytes, "application/pdf");
-  };
-
-
   return (
-    <PageShell title="Ledger" sub="Running balance view"
+    <PageShell title="Financial Ledger" sub="Real-time running balance and history"
       actions={
-        <div className="flex gap-3">
-          <div className="flex bg-gray-100 p-1 rounded-lg">
+        <div className="flex items-center gap-3">
+          <div className="bg-gray-100 p-1 rounded-xl flex gap-1 border border-gray-200/50">
             {["bank", "internal"].map(s => (
               <button key={s} onClick={() => setSource(s)}
-                className={`px-4 py-1.5 text-[12px] font-bold uppercase tracking-wider rounded-md transition-all ${source === s ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`px-6 py-2 text-[12px] font-bold uppercase tracking-wider rounded-lg transition-all ${source === s ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5" : "text-gray-500 hover:text-gray-700"}`}>
                 {s}
               </button>
             ))}
           </div>
-          <button className="btn-ghost text-[12px]" onClick={exportCSV}>Export CSV</button>
-          <button className="btn-ghost text-[12px]" onClick={exportPDF}>Export PDF</button>
+          <button onClick={exportCSV} className="btn-secondary flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export CSV
+          </button>
         </div>
       }>
-      <Card className="p-0 overflow-hidden shadow-sm border-gray-200">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50">
-                <th className="w-32">Date</th>
-                <th>Description</th>
-                <th className="w-32">Category</th>
-                <th className="w-32">Ref</th>
-                <th className="text-right w-32">Debit</th>
-                <th className="text-right w-32">Credit</th>
-                <th className="text-right w-40">Balance</th>
-                <th className="w-32">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                [1,2,3,4,5,6,7,8].map(i => (
-                  <tr key={i}>
-                    <td><div className="skeleton h-3 w-20 rounded" /></td>
-                    <td><div className="skeleton h-3 w-48 rounded" /></td>
-                    <td><div className="skeleton h-3 w-16 rounded" /></td>
-                    <td><div className="skeleton h-3 w-12 rounded" /></td>
-                    <td className="text-right"><div className="skeleton h-3 w-16 rounded ml-auto" /></td>
-                    <td className="text-right"><div className="skeleton h-3 w-16 rounded ml-auto" /></td>
-                    <td className="text-right"><div className="skeleton h-3 w-24 rounded ml-auto" /></td>
-                    <td><div className="skeleton h-5 w-16 rounded-full" /></td>
-                  </tr>
-                ))
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-20 text-center">
-                    <div className="flex flex-col items-center max-w-xs mx-auto">
-                      <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                      </div>
-                      <p className="text-sm font-bold text-gray-900 mb-1">No ledger entries</p>
-                      <p className="text-xs text-gray-500">Records will appear here once transactions are processed.</p>
-                    </div>
-                  </td>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Metric title="Total Debits" value={stats.debit} type="currency" trend="-2.4%" color="red" />
+        <Metric title="Total Credits" value={stats.credit} type="currency" trend="+12.5%" color="green" />
+        <Metric title="Closing Balance" value={stats.balance} type="currency" color="blue" />
+      </div>
+
+      <Card className="p-0 overflow-hidden border-gray-200/60 shadow-xl bg-white/80 backdrop-blur-sm">
+        {loading ? (
+          <div className="p-20 text-center flex flex-col items-center gap-4">
+            <Spinner size={40} color="#EF4444" />
+            <p className="text-gray-400 font-medium animate-pulse">Calculating balances...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-100">
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Date</th>
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Description</th>
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Category</th>
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Reference</th>
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest text-right">Debit</th>
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest text-right">Credit</th>
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest text-right">Balance</th>
+                  <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
                 </tr>
-              ) : (
-                rows.map(r => (
-                  <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="mono text-gray-500 text-[12px]">{r.date}</td>
-                    <td className="font-semibold text-gray-900 truncate max-w-[200px]">{r.description}</td>
-                    <td className="text-gray-500 text-[13px]">{r.category || "—"}</td>
-                    <td className="mono text-gray-400 text-[11px]">{r.reference || "—"}</td>
-                    <td className="mono text-right text-red-600 tabular-nums">{r.debit ? r.debit.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}</td>
-                    <td className="mono text-right text-green-600 tabular-nums">{r.credit ? r.credit.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}</td>
-                    <td className={`mono text-right font-bold tabular-nums ${r.balance >= 0 ? "text-gray-900" : "text-red-600"}`}>{r.balance?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-                    <td><Tag label={r.status} /></td>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-24 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
+                          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </div>
+                        <h3 className="text-gray-900 font-bold">No ledger entries found</h3>
+                        <p className="text-gray-500 text-sm max-w-xs">There are no transactions recorded for the {source} source yet.</p>
+                      </div>
+                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  rows.map((r, i) => (
+                    <tr key={r.id || i} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="px-6 py-4 text-gray-500 text-[12px] mono">{r.date}</td>
+                      <td className="px-6 py-4 font-semibold text-gray-900 text-[14px] leading-tight group-hover:text-red-600 transition-colors">{r.description}</td>
+                      <td className="px-6 py-4 text-gray-500 text-[13px]">{r.category || "General"}</td>
+                      <td className="px-6 py-4 text-gray-300 text-[11px] mono group-hover:text-gray-500">{r.reference || "—"}</td>
+                      <td className="px-6 py-4 text-right mono text-red-500 tabular-nums">{r.debit ? r.debit.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</td>
+                      <td className="px-6 py-4 text-right mono text-green-600 tabular-nums">{r.credit ? r.credit.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</td>
+                      <td className={`px-6 py-4 text-right mono font-bold tabular-nums text-[14px] ${r.balance >= 0 ? "text-gray-900" : "text-red-600"}`}>
+                        {r.balance?.toLocaleString("en-IN", { minimumFractionDigits: 2, style: "currency", currency: "INR" })}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Tag label={r.status} color={r.status === 'matched' ? 'green' : r.status === 'exception' ? 'red' : 'gray'} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </PageShell>
   );

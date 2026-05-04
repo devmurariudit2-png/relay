@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Card from "../components/ui/Card.jsx";
@@ -7,6 +8,7 @@ import Metric from "../components/ui/Metric.jsx";
 import { fmt } from "../utils/format.js";
 
 export default function Reconcile({ toast }) {
+  const queryClient = useQueryClient();
   const [result, setResult] = useState(null);
   const [running, setRunning] = useState(false);
 
@@ -59,18 +61,51 @@ export default function Reconcile({ toast }) {
 
   const exportCSV = () => {
     if (!result) return;
+
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return "";
+      const str = String(val);
+      // Wrap in quotes if value contains comma, quote, or newline
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const now = new Date();
+    const generatedAt = now.toLocaleString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour12: false,
+    });
+
+    const isBalanced = Math.abs(result.variance || 0) < 1;
+
+    const headers = ["Field", "Value"];
     const rows = [
-      ["status", result.status || ""],
-      ["matched", result.matched ?? 0],
-      ["unmatched", result.unmatched ?? 0],
-      ["exceptions", result.exceptions ?? 0],
-      ["bank_total", result.bank_total ?? 0],
-      ["internal_total", result.internal_total ?? 0],
-      ["variance", result.variance ?? 0],
-      ["generated_at", new Date().toISOString()],
+      ["Status",         result.status || (isBalanced ? "BALANCED" : "VARIANCE DETECTED")],
+      ["Matched",        result.matched   ?? 0],
+      ["Unmatched",      result.unmatched ?? 0],
+      ["Exceptions",     result.exceptions ?? 0],
+      ["Bank Total",     result.bank_total ?? 0],
+      ["Internal Total", result.internal_total ?? 0],
+      ["Variance",       result.variance ?? 0],
+      ["Generated At",   generatedAt],
     ];
-    const csv = rows.map(([k, v]) => `${k},${JSON.stringify(v)}`).join("\n");
-    downloadFile(`reconciliation-report-${new Date().toISOString().slice(0, 10)}.csv`, csv, "text/csv;charset=utf-8");
+
+    // UTF-8 BOM so Excel opens it correctly
+    const BOM = "\uFEFF";
+    const csvLines = [
+      headers.map(escapeCSV).join(","),
+      ...rows.map((row) => row.map(escapeCSV).join(",")),
+    ];
+    const csv = BOM + csvLines.join("\r\n");
+
+    downloadFile(
+      `reconciliation-report-${now.toISOString().slice(0, 10)}.csv`,
+      csv,
+      "text/csv;charset=utf-8"
+    );
   };
 
   const exportPDF = () => {
@@ -93,7 +128,15 @@ export default function Reconcile({ toast }) {
  
   const run = async () => {
     setRunning(true); setResult(null);
-    try { const r = await API.reconcile(); setResult(r); toast("Reconciliation complete!"); }
+    try {
+      const r = await API.reconcile();
+      setResult(r);
+      toast("Reconciliation complete!");
+      // Sync dashboard instantly
+      queryClient.invalidateQueries({ queryKey: ['summary'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    }
     catch (e) { toast(e.message, "error"); }
     finally { setRunning(false); }
   };
