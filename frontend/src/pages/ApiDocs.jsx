@@ -3,7 +3,7 @@ import PageShell from "../components/layout/PageShell.jsx";
 import Spinner from "../components/ui/Spinner.jsx";
 import { fetchAuth } from "../api/index.js";
 
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.MODE === "development" ? "http://localhost:5000" : window.location.origin);
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const MANUAL_SECTIONS = [
   {
@@ -131,14 +131,28 @@ const FIELD_DESCRIPTIONS = {
   token: "Invite token received via email",
 };
 
-function generateCurl(path, method, spec) {
-  let curl = `curl -X ${method.toUpperCase()} ${API_BASE}${path} \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -H "Content-Type: application/json"`;
+function generateSnippet(path, method, spec, lang) {
+  const methodUpper = method.toUpperCase();
+  const fullUrl = `${API_BASE}${path}`;
   const props = spec?.requestBody?.content?.["application/json"]?.schema?.properties;
+  const dummy = {};
   if (props) {
-    const dummy = {};
     for (const [k, v] of Object.entries(props)) {
       dummy[k] = v.example || FIELD_EXAMPLES[k] || (v.type === "number" ? 0 : v.type === "array" ? [] : "value");
     }
+  }
+
+  if (lang === "node") {
+    return `const axios = require('axios');\n\nconst data = ${JSON.stringify(dummy, null, 2)};\n\naxios({\n  method: '${method}',\n  url: '${fullUrl}',\n  headers: {\n    'Authorization': 'Bearer YOUR_TOKEN',\n    'Content-Type': 'application/json'\n  }${props ? ',\n  data: data' : ''}\n})\n.then(res => console.log(res.data))\n.catch(err => console.error(err));`;
+  }
+
+  if (lang === "python") {
+    return `import requests\nimport json\n\nurl = "${fullUrl}"\npayload = ${JSON.stringify(dummy, null, 2)}\nheaders = {\n    'Authorization': 'Bearer YOUR_TOKEN',\n    'Content-Type': 'application/json'\n}\n\nresponse = requests.request("${methodUpper}", url, headers=headers, data=json.dumps(payload))\nprint(response.json())`;
+  }
+
+  // Default to cURL
+  let curl = `curl -X ${methodUpper} ${fullUrl} \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -H "Content-Type: application/json"`;
+  if (props) {
     curl += ` \\\n  -d '${JSON.stringify(dummy, null, 2)}'`;
   }
   return curl;
@@ -187,11 +201,21 @@ export default function ApiDocs({ user, toast }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeItem, setActiveItem] = useState({ type: "manual", data: MANUAL_SECTIONS[0] });
-  const [copied, setCopied] = useState(false);
+  const [selectedLang, setSelectedLang] = useState("curl");
+  const [copiedSection, setCopiedSection] = useState(null); // 'request' or 'response'
 
   useEffect(() => {
-    fetchAuth("/api-docs.json")
-      .then((data) => { setSpec(data); setError(null); })
+    // Force absolute URL to ensure spec loads across domains
+    const specUrl = API_BASE.endsWith('/') ? `${API_BASE}api-docs.json` : `${API_BASE}/api-docs.json`;
+    fetchAuth(specUrl)
+      .then((data) => { 
+        if (data && data.paths) {
+          setSpec(data); 
+          setError(null); 
+        } else {
+          throw new Error("Invalid OpenAPI spec format");
+        }
+      })
       .catch((err) => {
         console.error("Failed to load OpenAPI spec:", err);
         setError("Failed to load API documentation.");
@@ -212,10 +236,10 @@ export default function ApiDocs({ user, toast }) {
     return grouped;
   }, [spec]);
 
-  const handleCopy = (text) => {
+  const handleCopy = (text, section) => {
     copyToClipboard(text, toast);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedSection(section);
+    setTimeout(() => setCopiedSection(null), 2000);
   };
 
   if (loading) {
@@ -359,33 +383,63 @@ export default function ApiDocs({ user, toast }) {
         </div>
 
         {/* Right Area (Code Snippets) */}
-        <div className="w-full xl:w-[450px] bg-[#0A0C10] flex-shrink-0 flex flex-col overflow-y-auto text-gray-300 xl:min-h-[700px]">
+        <div className="w-full xl:w-[450px] bg-[#0A0C10] flex-shrink-0 flex flex-col overflow-y-auto text-gray-300 xl:min-h-[700px] border-l border-gray-800">
           {activeItem.type === "manual" ? (
             <div className="p-8">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500">Example</h4>
+                <button
+                  onClick={() => handleCopy(activeItem.data.codeSnippet, "manual")}
+                  className="text-[11px] font-bold text-gray-500 hover:text-white transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5"
+                >
+                  {copiedSection === "manual" ? "✓ COPIED" : "COPY"}
+                </button>
+              </div>
               <pre className="text-[13px] font-mono text-gray-300 overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
                 {activeItem.data.codeSnippet}
               </pre>
             </div>
           ) : (
             <>
+              {/* Language Tabs */}
+              <div className="flex border-b border-gray-800/60 bg-[#0F1116]">
+                {["curl", "node", "python"].map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setSelectedLang(lang)}
+                    className={`px-6 py-4 text-[11px] font-bold uppercase tracking-widest border-none cursor-pointer transition-all ${selectedLang === lang ? "text-white border-b-2 border-white bg-[#161B22]" : "text-gray-500 hover:text-gray-300 bg-transparent"}`}
+                  >
+                    {lang === "curl" ? "cURL" : lang === "node" ? "Node.js" : "Python"}
+                  </button>
+                ))}
+              </div>
+
               <div className="p-8 border-b border-gray-800/60">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">Request (cURL)</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500">Request</h4>
                   <button
-                    onClick={() => handleCopy(generateCurl(activeItem.data.path, activeItem.data.method, activeItem.data.spec))}
-                    className="text-xs text-gray-500 hover:text-white bg-transparent border-none cursor-pointer p-0 transition-colors"
+                    onClick={() => handleCopy(generateSnippet(activeItem.data.path, activeItem.data.method, activeItem.data.spec, selectedLang), "request")}
+                    className="text-[11px] font-bold text-gray-500 hover:text-white transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5"
                   >
-                    {copied ? "✓ Copied" : "Copy"}
+                    {copiedSection === "request" ? "✓ COPIED" : "COPY"}
                   </button>
                 </div>
-                <pre className="text-[13px] font-mono text-gray-300 overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
-                  {generateCurl(activeItem.data.path, activeItem.data.method, activeItem.data.spec)}
-                </pre>
+                <div className="relative group">
+                  <pre className="text-[13px] font-mono text-gray-300 overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
+                    {generateSnippet(activeItem.data.path, activeItem.data.method, activeItem.data.spec, selectedLang)}
+                  </pre>
+                </div>
               </div>
 
               <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">Response (JSON)</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500">Response (JSON)</h4>
+                  <button
+                    onClick={() => handleCopy(generateResponse(activeItem.data.spec, activeItem.data.method), "response")}
+                    className="text-[11px] font-bold text-gray-500 hover:text-white transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5"
+                  >
+                    {copiedSection === "response" ? "✓ COPIED" : "COPY"}
+                  </button>
                 </div>
                 <pre className="text-[13px] font-mono text-gray-300 overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
                   {generateResponse(activeItem.data.spec, activeItem.data.method)}
