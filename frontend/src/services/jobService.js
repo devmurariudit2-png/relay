@@ -39,7 +39,6 @@ class JobService {
         };
         
         this.jobs.set(response.jobId, job);
-        console.log('[JobService] Started reconciliation job:', response.jobId);
         
         return {
           jobId: response.jobId,
@@ -96,7 +95,6 @@ class JobService {
       if (this.pollingIntervals.has(jobId)) {
         clearInterval(this.pollingIntervals.get(jobId));
         this.pollingIntervals.delete(jobId);
-        console.log('[JobService] Stopped polling for job:', jobId);
       }
     } catch (error) {
       console.error('[JobService] Error canceling polling:', error);
@@ -185,7 +183,6 @@ class JobService {
     }, pollInterval);
 
     this.pollingIntervals.set(jobId, interval);
-    console.log('[JobService] Started polling for job:', jobId);
   }
 
   /**
