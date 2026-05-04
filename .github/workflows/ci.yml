@@ -29,7 +29,9 @@ jobs:
         run: npm ci
 
       - name: Run Backend Tests
-        run: npm test -w Relay-main
+        run: |
+          npm install @rolldown/binding-linux-x64-gnu --no-save -w Relay-main
+          SUPABASE_URL=http://localhost SUPABASE_SERVICE_ROLE_KEY=testkey npm test -w Relay-main
 
   deploy-database:
     name: Push Database Migrations
