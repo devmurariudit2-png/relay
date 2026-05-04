@@ -39,7 +39,6 @@ class JobService {
         };
         
         this.jobs.set(response.jobId, job);
-        console.log('[JobService] Started reconciliation job:', response.jobId);
         
         return {
           jobId: response.jobId,
@@ -96,10 +95,9 @@ class JobService {
       if (this.pollingIntervals.has(jobId)) {
         clearInterval(this.pollingIntervals.get(jobId));
         this.pollingIntervals.delete(jobId);
-        console.log('[JobService] Stopped polling for job:', jobId);
       }
     } catch (error) {
-      console.error('[JobService] Error canceling polling:', error);
+      // Error in canceling polling - no action needed for frontend client
     }
   }
 
@@ -172,7 +170,6 @@ class JobService {
           }
         }
       } catch (error) {
-        console.error('[JobService] Polling error for job', jobId, ':', error);
         job.error = error.message;
         if (job.callbacks.onError) {
           job.callbacks.onError({
@@ -185,7 +182,6 @@ class JobService {
     }, pollInterval);
 
     this.pollingIntervals.set(jobId, interval);
-    console.log('[JobService] Started polling for job:', jobId);
   }
 
   /**
@@ -237,10 +233,9 @@ class JobService {
   }
 
   /**
-   * Format and log errors consistently
+   * Format errors consistently
    */
   formatError(error) {
-    console.error('[JobService] Error:', error);
     return {
       message: error.message || 'An error occurred',
       status: error.status,
