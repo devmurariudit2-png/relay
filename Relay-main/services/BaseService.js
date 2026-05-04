@@ -1,4 +1,5 @@
 const { AppError, Errors } = require("../errors/AppError");
+const { parse } = require('csv-parse/sync');
 
 // ── Fallback Store (In-memory seed data for demo/offline mode) ───────────────
 const FALLBACK_STORE = {
@@ -43,6 +44,7 @@ class BaseService {
         return await handleSupabaseRequest(serviceName, args, context);
       }
 
+      const instance = new this(args, context);
       const result = await instance.run();
 
       if (context && context.logger) {
@@ -171,21 +173,62 @@ async function handleSupabaseRequest(serviceName, args, context) {
   }
 
   if (serviceName.includes('ImportCsv')) {
-    const { parse } = require('csv-parse/sync');
-    const rows = parse(args.fileBuffer, { columns: true, skip_empty_lines: true, trim: true });
-    const docs = rows.map(r => ({
-      date: r.date,
-      description: r.description,
-      amount: parseFloat(r.amount),
-      currency: (r.currency || 'USD').toUpperCase(),
-      reference: r.reference || null,
-      source: args.source,
-      status: 'pending',
-      user_id: userId
-    }));
+    let rows;
+    try {
+      rows = parse(args.fileBuffer, { 
+        columns: header => header.map(h => h.toLowerCase().trim()),
+        skip_empty_lines: true, 
+        trim: true 
+      });
+    } catch (err) {
+      throw new AppError(Errors.BAD_REQUEST, { message: `CSV Parse Error: ${err.message}` });
+    }
+    
+    if (!rows || rows.length === 0) {
+      return { imported: 0, source: args.source };
+    }
+
+    const docs = rows.map((r, i) => {
+      // Robust amount parsing: remove currency symbols and commas
+      let rawAmt = String(r.amount || '0').replace(/[$,]/g, '');
+      const amount = parseFloat(rawAmt);
+
+      // Simple date normalization (handle DD/MM/YYYY or MM/DD/YYYY to YYYY-MM-DD if possible)
+      let date = r.date;
+      if (date && date.includes('/')) {
+        const parts = date.split('/');
+        if (parts.length === 3) {
+          if (parts[2].length === 4) { // DD/MM/YYYY or MM/DD/YYYY
+             // Assume ISO-ish for now or try to reformat
+             // This is a guess, but YYYY-MM-DD is safest for PG
+             if (parseInt(parts[0]) > 12) { // DD/MM/YYYY
+               date = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+             } else { // MM/DD/YYYY
+               date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+             }
+          }
+        }
+      }
+
+      return {
+        date: date || new Date().toISOString().split('T')[0],
+        description: r.description || `Imported transaction ${i+1}`,
+        amount: isNaN(amount) ? 0 : amount,
+        currency: (r.currency || 'USD').toUpperCase(),
+        reference: r.reference || r.ref || null,
+        category: r.category || null,
+        source: args.source || 'bank',
+        status: 'pending',
+        user_id: userId
+      };
+    });
+
     const { data, error } = await supabase.from('transactions').insert(docs).select();
-    if (error) throw error;
-    return { imported: data.length, source: args.source };
+    if (error) {
+      console.error('Supabase Import Error:', error);
+      throw error;
+    }
+    return { imported: (data || []).length, source: args.source };
   }
 
   if (serviceName.includes('DeleteTransaction')) {
