@@ -12,7 +12,7 @@ const LoginService = require('../services/auth/LoginService');
 const UpdateProfileService = require('../services/auth/UpdateProfileService');
 const ChangePasswordService = require('../services/auth/ChangePasswordService');
 
-const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
 
 /**
  * @openapi
@@ -114,7 +114,14 @@ router.post('/login',
  */
 // GET /auth/me
 router.get('/me', protect, (req, res) => {
-  R.success(res, req.user.toSafeObject());
+  R.success(res, {
+    id: req.user.id,
+    email: req.user.email,
+    full_name: req.user.full_name || req.user.user_metadata?.full_name,
+    role: req.user.role,
+    org_name: req.user.org_name,
+    active: req.user.active
+  });
 });
 
 /**
@@ -210,19 +217,15 @@ router.post('/forgot-password', authLimiter, async (req, res, next) => {
     const { email } = req.body;
     if (!email) return R.badRequest(res, 'Email is required');
     
-    const user = await User.findOne({ email });
-    if (!user) {
-      // Return 200 even if user not found to prevent email enumeration
-      return R.success(res, { message: 'If an account with that email exists, we sent a password reset link.' });
+    if (process.env.SUPABASE_URL) {
+      const supabase = require('../config/supabase');
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password`
+      });
+      if (error) req.context.logger.error('Password reset error', { error: error.message });
     }
 
-    const { randomBytes } = require('crypto');
-    const resetToken = randomBytes(32).toString('hex');
-    user.forgotPasswordToken = resetToken;
-    user.forgotPasswordExpires = Date.now() + 1000 * 60 * 60; // 1 hour
-    await user.save();
-
-    req.context.logger.info(`[MOCK EMAIL] Password Reset Link: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`);
+    // Always return 200 to prevent email enumeration
     return R.success(res, { message: 'If an account with that email exists, we sent a password reset link.' });
   } catch (err) { next(err); }
 });
@@ -249,23 +252,17 @@ router.post('/forgot-password', authLimiter, async (req, res, next) => {
  */
 router.post('/reset-password', authLimiter, async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
-    if (!token || !newPassword || newPassword.length < 6) 
-      return R.badRequest(res, 'Valid token and newPassword (min 6 chars) required');
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) 
+      return R.badRequest(res, 'newPassword (min 6 chars) required');
 
-    const user = await User.findOne({ 
-      forgotPasswordToken: token,
-      forgotPasswordExpires: { $gt: Date.now() }
-    });
+    if (process.env.SUPABASE_URL) {
+      // In Supabase flow, the token is handled by the redirect URL
+      // The frontend sends the new password after the user lands on the reset page
+      return R.success(res, { message: 'Use Supabase Auth SDK on frontend to complete password reset.' });
+    }
 
-    if (!user) return R.badRequest(res, 'Invalid or expired reset token');
-
-    user.password = newPassword;
-    user.forgotPasswordToken = null;
-    user.forgotPasswordExpires = null;
-    await user.save();
-
-    return R.success(res, { message: 'Password reset successful. You can now login.' });
+    return R.badRequest(res, 'Password reset not available without database');
   } catch (err) { next(err); }
 });
 

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Spinner from "../components/ui/Spinner.jsx";
@@ -7,8 +8,13 @@ import Tag from "../components/ui/Tag.jsx";
 
 export default function Ledger({ toast }) {
   const [source, setSource] = useState("bank");
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const { data: rows = [], isLoading: loading, error } = useQuery({
+    queryKey: ['ledger', source],
+    queryFn: () => API.getLedger(source)
+  });
+
+  if (error) { toast(error.message, "error"); }
 
   const downloadFile = (name, content, type) => {
     const blob = new Blob([content], { type });
@@ -87,10 +93,6 @@ export default function Ledger({ toast }) {
     downloadFile(`ledger-${source}-${new Date().toISOString().slice(0, 10)}.pdf`, pdfBytes, "application/pdf");
   };
 
-  useEffect(() => {
-    setLoading(true);
-    API.getLedger(source).then(setRows).catch(e => toast(e.message, "error")).finally(() => setLoading(false));
-  }, [source, toast]);
 
   return (
     <PageShell title="Ledger" sub="Running balance view"

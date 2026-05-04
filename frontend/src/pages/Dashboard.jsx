@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Spinner from "../components/ui/Spinner.jsx";
@@ -9,16 +9,15 @@ import Spark from "../components/ui/Spark.jsx";
 import { fmt } from "../utils/format.js";
 
 export default function Dashboard({ user }) {
-  const [summary, setSummary] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: summary, isLoading: sumLoading } = useQuery({ queryKey: ['summary'], queryFn: API.getSummary });
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ['analytics'],
+    queryFn: API.getAdminAnalytics,
+    enabled: user?.role === "admin",
+    retry: false
+  });
 
-  useEffect(() => {
-    Promise.all([
-      API.getSummary().catch(() => null),
-      user?.role === "admin" ? API.getAdminAnalytics().catch(() => null) : Promise.resolve(null),
-    ]).then(([s, a]) => { setSummary(s); setAnalytics(a); setLoading(false); });
-  }, []);
+  const loading = sumLoading || (user?.role === "admin" && analyticsLoading);
 
   if (loading) return <PageShell title="Dashboard"><div style={{ display: "flex", justifyContent: "center", padding: 80 }}><Spinner size={32} /></div></PageShell>;
 

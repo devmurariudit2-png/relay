@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "./supabase";
 import * as API from "./api/index.js";
 import Spinner from "./components/ui/Spinner.jsx";
 import Landing from "./pages/Landing.jsx";
@@ -9,36 +10,52 @@ import AppShell from "./components/layout/AppShell.jsx";
 
 export default function App() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  const { data: fetchedUser, isLoading, isError } = useQuery({
+  useEffect(() => {
+    // 1. Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsInitializing(false);
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) {
+        setUser(null);
+        queryClient.clear();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [queryClient]);
+
+  const { data: fetchedUser, isLoading: isUserLoading } = useQuery({
     queryKey: ['me'],
     queryFn: API.getMe,
     retry: false,
-    enabled: !!localStorage.getItem("rec_token")
+    enabled: !!session,
   });
 
   useEffect(() => {
     if (fetchedUser) setUser(fetchedUser);
   }, [fetchedUser]);
 
-  useEffect(() => {
-    if (isError) {
-      localStorage.removeItem("rec_token");
-      setUser(null);
-      navigate("/");
-    }
-  }, [isError, navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("rec_token");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
+    queryClient.clear();
     navigate("/");
   };
 
-  const isAuth = !!user || !!localStorage.getItem("rec_token");
+  const isAuth = !!session;
 
-  if (isLoading) {
+  if (isInitializing || (isAuth && isUserLoading)) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F9FAFB" }}><Spinner size={32} /></div>;
   }
 

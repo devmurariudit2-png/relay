@@ -93,9 +93,17 @@ const scheduleAutoReconcile = () => {
   const interval = minutes * 60 * 1000;
   setInterval(async () => {
     try {
-      const users = await User.find({ active: true }).select('_id').lean();
-      users.forEach((user) => enqueueReconcile(user._id));
-      logger.info('Auto-scheduled reconcile jobs enqueued', { count: users.length });
+      let userIds = [];
+      if (process.env.SUPABASE_URL) {
+        const supabase = require('../config/supabase');
+        const { data } = await supabase.from('profiles').select('id').eq('active', true);
+        userIds = (data || []).map(u => u.id);
+      } else {
+        const users = await User.find({ active: true }).select('_id').lean();
+        userIds = users.map(u => u._id);
+      }
+      userIds.forEach((id) => enqueueReconcile(id));
+      logger.info('Auto-scheduled reconcile jobs enqueued', { count: userIds.length });
     } catch (err) {
       logger.error('Auto reconcile schedule failure', { error: err.message, stack: err.stack });
     }

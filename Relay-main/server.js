@@ -61,6 +61,7 @@ const swaggerDefinition = {
     { name: 'Tickets',      description: 'Support ticket management' },
     { name: 'Team',         description: 'Team / organization management' },
     { name: 'Admin',        description: 'Admin-only operations (role: admin)' },
+    { name: 'Stripe',       description: 'Subscription & payment management' },
     { name: 'System',       description: 'Health & system endpoints' },
   ],
 };
@@ -134,36 +135,31 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(apiLimiter);
 
 // ── Health check (public, no auth) ───────────────────────────────────────────
-/**
- * @openapi
- * /health:
- *   get:
- *     tags: [System]
- *     summary: Health check
- *     description: Returns the current health and uptime of the API server.
- *     security: []
- *     responses:
- *       200:
- *         description: API is healthy
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:    { type: string, example: healthy }
- *                 service:   { type: string, example: 'Relay API' }
- *                 version:   { type: string, example: '4.0.0' }
- *                 uptime:    { type: integer, example: 3600 }
- *                 timestamp: { type: string, format: date-time }
- */
-app.get('/health', (req, res) => {
-  res.json({
-    status:  'healthy',
-    service: 'Relay API',
-    version: '4.0.0',
-    uptime:  Math.round(process.uptime()),
+// Docs for this endpoint are in routes/system.js
+app.get('/health', async (req, res) => {
+  const health = {
+    status:    'healthy',
+    service:   'Relay API',
+    version:   '4.0.0',
+    uptime:    Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
-  });
+    database:  'unknown',
+  };
+
+  try {
+    if (process.env.SUPABASE_URL) {
+      const supabase = require('./config/supabase');
+      const { error } = await supabase.from('profiles').select('id').limit(1);
+      health.database = error ? 'degraded' : 'connected';
+      if (error) health.status = 'degraded';
+    }
+  } catch (err) {
+    health.database = 'unreachable';
+    health.status = 'degraded';
+  }
+
+  const statusCode = health.status === 'healthy' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // ── Swagger / OpenAPI ─────────────────────────────────────────────────────────
@@ -215,34 +211,58 @@ app.use('/stripe',       require('./routes/stripe'));
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, async () => {
-  await startServer();
-  logger.info(`Reconciler API v4 running on port ${PORT}`, { env: process.env.NODE_ENV });
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000;
+  const server = app.listen(PORT, async () => {
+    await startServer();
+    logger.info(`Reconciler API v4 running on port ${PORT}`, { env: process.env.NODE_ENV });
+  });
+
+  // Graceful shutdown
+  const shutdown = async (signal) => {
+    logger.info(`Received ${signal}. Shutting down gracefully...`);
+    server.close(async () => {
+      logger.info('HTTP server closed.');
+      try {
+        // Only close MongoDB if we're not in Supabase mode
+        if (!process.env.SUPABASE_URL) {
+          const mongoose = require('mongoose');
+          if (mongoose.connection.readyState === 1) {
+            await mongoose.connection.close();
+            logger.info('MongoDB connection closed.');
+          }
+        }
+      } catch (err) {
+        logger.error('Error during cleanup', err);
+      }
+      if (signal === 'SIGUSR2') {
+        process.kill(process.pid, 'SIGUSR2');
+      } else {
+        process.exit(0);
+      }
+    });
+  };
+
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGUSR2', () => shutdown('SIGUSR2'));
+} else {
+  // For Vercel/Serverless
+  startServer();
+}
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  if (process.env.NODE_ENV === 'production') {
+    // shutdown('UNHANDLED_REJECTION');
+  }
 });
 
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception thrown:', err);
+  if (process.env.NODE_ENV === 'production') {
+    // shutdown('UNCAUGHT_EXCEPTION');
+  }
+});
 
-// Graceful shutdown to fix nodemon EADDRINUSE
-const mongoose = require('mongoose');
-
-const shutdown = async (signal) => {
-  logger.info(`Received ${signal}. Shutting down gracefully...`);
-  server.close(async () => {
-    logger.info('HTTP server closed.');
-    try {
-      await mongoose.connection.close();
-      logger.info('MongoDB connection closed.');
-    } catch (err) {
-      logger.error('Error closing MongoDB connection', err);
-    }
-    if (signal === 'SIGUSR2') {
-      process.kill(process.pid, 'SIGUSR2');
-    } else {
-      process.exit(0);
-    }
-  });
-};
-
-process.once('SIGINT', () => shutdown('SIGINT'));
-process.once('SIGTERM', () => shutdown('SIGTERM'));
-process.once('SIGUSR2', () => shutdown('SIGUSR2'));
+module.exports = app;

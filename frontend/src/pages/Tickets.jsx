@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Card from "../components/ui/Card.jsx";
@@ -7,21 +8,23 @@ import Tag from "../components/ui/Tag.jsx";
 import Modal from "../components/ui/Modal.jsx";
 
 export default function Tickets({ user, toast }) {
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", priority: "medium", category: "" });
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const load = () => {
-    setLoading(true);
-    API.getTickets({ limit: 50 }).then(r => {
-      setTickets(r.data || r);
-    }).catch(e => toast(e.message, "error")).finally(() => setLoading(false));
-  };
-  useEffect(load, []);
+  const { data: r, isLoading: loading, error } = useQuery({
+    queryKey: ['tickets'],
+    queryFn: () => API.getTickets({ limit: 50 })
+  });
+
+  if (error) { toast(error.message, "error"); }
+
+  const tickets = r?.data || r || [];
+
+  const load = () => { queryClient.invalidateQueries({ queryKey: ['tickets'] }); };
 
   const create = async () => {
     setSaving(true);

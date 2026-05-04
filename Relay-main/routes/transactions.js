@@ -190,6 +190,28 @@ router.get(
   },
 );
 
+/**
+ * @openapi
+ * /transactions/import:
+ *   post:
+ *     tags: [Transactions]
+ *     summary: Import transactions from CSV file
+ *     description: Upload a CSV file to batch-import transactions. Max file size 5MB.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file, source]
+ *             properties:
+ *               file:   { type: string, format: binary, description: 'CSV file to import' }
+ *               source: { type: string, enum: [bank, internal], description: 'Transaction source' }
+ *     responses:
+ *       200: { description: Import summary with count of created/skipped records }
+ *       400: { description: No file uploaded or invalid CSV format }
+ *       401: { description: Unauthorized }
+ */
 // ── POST /transactions/import — CSV upload ───────────────────────────────────
 router.post('/import',
   protect,

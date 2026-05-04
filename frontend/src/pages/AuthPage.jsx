@@ -20,7 +20,7 @@ export default function AuthPage({ onLogin, onBack }) {
       const r = mode === "login"
         ? await API.login(form.email, form.password)
         : await API.register(form.name, form.email, form.password);
-      localStorage.setItem("rec_token", r.token);
+      
       onLogin(r.user);
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }

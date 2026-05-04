@@ -1,61 +1,54 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const authService = require('../services/authService');
+const supabase = require('../config/supabase');
 const R = require('../utils/response');
-const logger = require('../utils/logger');
 
-/** Verify JWT and attach req.user */
+/** Verify Supabase Token and attach user profile */
 const protect = async (req, res, next) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer '))
     return R.unauthorized(res, 'No token provided');
 
   const token = auth.split(' ')[1];
-  if (authService.isTokenRevoked(token))
-    return R.unauthorized(res, 'Token revoked. Please log in again');
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    let user;
+    // 1. Verify token with Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    try {
-      user = await User.findById(decoded.id).select('-password');
-    } catch (dbErr) {
-      if (process.env.DEMO_BYPASS === 'true') {
-        console.log('[DEMO BYPASS] DB Error in auth, using mock user');
-        user = {
-          _id: decoded.id,
-          name: 'Demo User',
-          email: 'demo@example.com',
-          role: 'admin',
-          active: true,
-          toSafeObject: () => ({ id: decoded.id, name: 'Demo User', role: 'admin' })
-        };
-      } else {
-        throw dbErr;
-      }
+    if (authError || !user) {
+      return R.unauthorized(res, 'Session expired or invalid token');
     }
 
-    if (!user)          return R.unauthorized(res, 'User not found');
-    if (!user.active)   return R.unauthorized(res, 'Account is deactivated');
-    req.user = user;
-    req.context.user = user;
+    // 2. Fetch profile data from PostgreSQL
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      // Create profile if missing
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .insert([{ id: user.id, email: user.email, role: 'member' }])
+        .select()
+        .single();
+      req.user = { ...user, ...newProfile, _id: user.id };
+    } else {
+      req.user = { ...user, ...profile, _id: user.id };
+    }
+
+    req.context.user = req.user;
     next();
   } catch (err) {
-
-    logger.warn('Invalid JWT', { error: err.message, ip: req.ip });
-    return R.unauthorized(res, 'Invalid or expired token');
+    return R.unauthorized(res, 'Authentication failed');
   }
 };
 
-/** Require admin role */
 const adminOnly = (req, res, next) => {
   if (req.user?.role !== 'admin')
     return R.forbidden(res, 'Admin access required');
   next();
 };
 
-/** Require admin or member role (viewers are read-only) */
 const memberOrAdmin = (req, res, next) => {
   if (!['admin', 'member'].includes(req.user?.role))
     return R.forbidden(res, 'Write access requires member or admin role');

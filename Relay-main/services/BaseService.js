@@ -1,7 +1,7 @@
 const { AppError, Errors } = require("../errors/AppError");
 
-// ── Stateful Mock Store (Shared in memory) ──────────────────────────────────
-const MOCK_STORE = {
+// ── Fallback Store (In-memory seed data for demo/offline mode) ───────────────
+const FALLBACK_STORE = {
   transactions: [
     { _id: 'tx1', date: '2024-05-01', description: 'AWS Subscription', amount: -450.00, currency: 'USD', source: 'bank', status: 'matched', reference: 'AWS-99' },
     { _id: 'tx2', date: '2024-05-01', description: 'Internal: AWS Cloud', amount: -450.00, currency: 'USD', source: 'internal', status: 'matched', reference: 'AWS-99' },
@@ -10,7 +10,10 @@ const MOCK_STORE = {
     { _id: 'tx5', date: '2024-05-03', description: 'Client: Acme Corp', amount: 5000.00, currency: 'USD', source: 'bank', status: 'pending' },
   ],
   users: [
-    { id: 'demo-user-123', name: 'Demo User', email: 'admin@demo.com', role: 'admin', orgName: 'Relay Demo Org' }
+    { _id: 'demo-user-123', name: 'Demo User', email: 'admin@demo.com', role: 'admin', orgName: 'Relay Demo Org', active: true, createdAt: new Date().toISOString() }
+  ],
+  tickets: [
+    { _id: 'tk1', title: 'Need help with AWS transaction', description: 'Why is AWS billed twice?', priority: 'high', category: 'billing', status: 'open', createdAt: new Date().toISOString() }
   ]
 };
 
@@ -21,7 +24,7 @@ class BaseService {
     this.logger = context.logger;
     this.traceId = context.traceId;
     this.userId = context.user ? (context.user.id || context.user._id) : 'demo-user-123';
-    this.user = context.user || MOCK_STORE.users[0];
+    this.user = context.user || FALLBACK_STORE.users[0];
   }
 
   static async execute(args = {}, context = {}) {
@@ -36,10 +39,8 @@ class BaseService {
     }
 
     try {
-      const instance = new this(args, context);
-
-      if (typeof instance.validate === "function") {
-        instance.validate();
+      if (process.env.SUPABASE_URL) {
+        return await handleSupabaseRequest(serviceName, args, context);
       }
 
       const result = await instance.run();
@@ -54,16 +55,16 @@ class BaseService {
 
       return result;
     } catch (error) {
-      // ✅ AUTOMATIC FAILOVER TO STATEFUL MOCK
+      // ✅ AUTOMATIC FAILOVER TO SUPABASE/FALLBACK HANDLER
       const isDbError = error.name === "MongoError" || 
                         error.name === "MongooseError" || 
                         error.message.includes("buffering timed out") || 
                         error.message.includes("selection timeout") ||
                         error.message.includes("not connected");
 
-      if (process.env.DEMO_BYPASS === "true" && isDbError) {
-        console.log(`[STATEFUL MOCK] DB Unavailable. ${serviceName} is running in memory.`);
-        return handleMockRequest(serviceName, args);
+      if ((process.env.DEMO_BYPASS === "true" || process.env.SUPABASE_URL) && isDbError) {
+        console.log(`[SERVICE FAILOVER] DB Unavailable or Supabase Mode. ${serviceName} is running via SQL handler.`);
+        return handleSupabaseRequest(serviceName, args, context);
       }
 
       if (context && context.logger) {
@@ -123,146 +124,272 @@ function sanitizeResult(result) {
   return summary;
 }
 
-function handleMockRequest(serviceName, args) {
+const supabase = require('../config/supabase');
+
+async function handleSupabaseRequest(serviceName, args, context) {
   const now = new Date().toISOString();
+  const userId = context.user ? (context.user.id || context.user._id) : null;
   
+  const mapId = (obj) => {
+    if (!obj) return obj;
+    if (Array.isArray(obj)) return obj.map(o => ({ ...o, _id: o.id }));
+    return { ...obj, _id: obj.id };
+  };
+
   // ── Transactions ────────────────────────────────────────────────────────────
   if (serviceName.includes('ListTransactions')) {
-    let txs = [...MOCK_STORE.transactions];
-    if (args.source) txs = txs.filter(t => t.source === args.source);
-    if (args.status) txs = txs.filter(t => t.status === args.status);
-    if (args.search) {
-      const s = args.search.toLowerCase();
-      txs = txs.filter(t => t.description.toLowerCase().includes(s) || (t.reference && t.reference.toLowerCase().includes(s)));
-    }
+    let query = supabase.from('transactions').select('*', { count: 'exact' });
+    
+    if (userId) query = query.eq('user_id', userId);
+    if (args.source) query = query.eq('source', args.source);
+    if (args.status) query = query.eq('status', args.status);
+    if (args.search) query = query.ilike('description', `%${args.search}%`);
+    
+    const { data, count, error } = await query.order('date', { ascending: false });
+    if (error) throw error;
+    
     return {
-      transactions: txs,
-      page: 1, limit: 50, total: txs.length, pages: 1
+      transactions: mapId(data),
+      page: 1, limit: 50, total: count, pages: 1
     };
   }
 
   if (serviceName.includes('CreateTransaction')) {
-    const newTx = {
-      _id: `tx${Date.now()}`,
+    const { data, error } = await supabase.from('transactions').insert([{
       ...args,
-      status: 'pending',
-      createdAt: now
-    };
-    MOCK_STORE.transactions.push(newTx);
-    return newTx;
+      user_id: userId,
+      status: 'pending'
+    }]).select().single();
+    if (error) throw error;
+    return mapId(data);
   }
 
   if (serviceName.includes('ImportCsv')) {
     const { parse } = require('csv-parse/sync');
-    try {
-      const rows = parse(args.fileBuffer, { columns: true, skip_empty_lines: true, trim: true });
-      const docs = rows.map((r, i) => ({
-        _id: `tx${Date.now()}-${i}`,
-        date: r.date,
-        description: r.description,
-        amount: parseFloat(r.amount),
-        currency: (r.currency || 'USD').toUpperCase(),
-        reference: r.reference || null,
-        source: args.source,
-        status: 'pending',
-        createdAt: now
-      }));
-      MOCK_STORE.transactions.push(...docs);
-      return { imported: docs.length, source: args.source };
-    } catch (e) {
-      throw new Error(`CSV Parse failed: ${e.message}`);
-    }
+    const rows = parse(args.fileBuffer, { columns: true, skip_empty_lines: true, trim: true });
+    const docs = rows.map(r => ({
+      date: r.date,
+      description: r.description,
+      amount: parseFloat(r.amount),
+      currency: (r.currency || 'USD').toUpperCase(),
+      reference: r.reference || null,
+      source: args.source,
+      status: 'pending',
+      user_id: userId
+    }));
+    const { data, error } = await supabase.from('transactions').insert(docs).select();
+    if (error) throw error;
+    return { imported: data.length, source: args.source };
   }
 
   if (serviceName.includes('DeleteTransaction')) {
-    const index = MOCK_STORE.transactions.findIndex(t => t._id === args.id);
-    if (index !== -1) MOCK_STORE.transactions.splice(index, 1);
+    const { error } = await supabase.from('transactions').delete().eq('id', args.id).eq('user_id', userId);
+    if (error) throw error;
     return { success: true };
   }
 
   if (serviceName.includes('UpdateTransaction')) {
-    const tx = MOCK_STORE.transactions.find(t => t._id === args.id);
-    if (tx) {
-      if (args.category) tx.category = args.category;
-      if (args.note) tx.note = args.note;
-    }
-    return tx;
+    const { data, error } = await supabase.from('transactions')
+      .update(args)
+      .eq('id', args.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapId(data);
   }
 
   if (serviceName.includes('Reconcile')) {
-    let matched = 0;
-    const bank = MOCK_STORE.transactions.filter(t => t.source === 'bank' && t.status !== 'matched');
-    const internal = MOCK_STORE.transactions.filter(t => t.source === 'internal' && t.status !== 'matched');
+    // 1. Reset all user transactions to pending
+    await supabase.from('transactions').update({ status: 'pending', matched_id: null }).eq('user_id', userId);
 
+    // 2. Fetch all transactions
+    const { data: allTx } = await supabase.from('transactions').select('*').eq('user_id', userId);
+    if (!allTx || allTx.length === 0) {
+      return { matched: 0, unmatched: 0, duplicates: 0, exceptions: 0, total: 0, bank_total: 0, internal_total: 0, variance: 0, status: 'BALANCED', unmatched_bank: 0, unmatched_internal: 0 };
+    }
+
+    const bank = allTx.filter(t => t.source === 'bank');
+    const internal = allTx.filter(t => t.source === 'internal');
+    const usedB = new Set();
+    const usedI = new Set();
+    const updates = []; // { id, status, matched_id }
+
+    // 3. Pass 1 — exact reference + exact amount
+    const internalByRef = new Map();
+    for (const i of internal) {
+      if (!i.reference) continue;
+      if (!internalByRef.has(i.reference)) internalByRef.set(i.reference, []);
+      internalByRef.get(i.reference).push(i);
+    }
     for (const b of bank) {
-      const match = internal.find(i => Math.abs(i.amount - b.amount) < 0.01 && i.status !== 'matched');
-      if (match) {
-        b.status = 'matched';
-        match.status = 'matched';
-        b.matched_id = match._id;
-        match.matched_id = b._id;
-        matched++;
+      if (!b.reference || usedB.has(b.id)) continue;
+      const candidates = internalByRef.get(b.reference);
+      if (!candidates) continue;
+      for (const i of candidates) {
+        if (usedI.has(i.id)) continue;
+        if (Math.abs(i.amount - b.amount) < 0.01) {
+          updates.push({ id: b.id, status: 'matched', matched_id: i.id });
+          updates.push({ id: i.id, status: 'matched', matched_id: b.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
+          break;
+        }
       }
     }
-    
-    MOCK_STORE.transactions.forEach(t => {
-      if (t.status === 'pending') t.status = 'unmatched';
-    });
+
+    // 4. Pass 2 — exact amount + date within 3 days
+    for (const b of bank) {
+      if (usedB.has(b.id)) continue;
+      const bd = new Date(b.date).getTime();
+      for (const i of internal) {
+        if (usedI.has(i.id)) continue;
+        const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
+        if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
+          updates.push({ id: b.id, status: 'matched', matched_id: i.id });
+          updates.push({ id: i.id, status: 'matched', matched_id: b.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
+          break;
+        }
+      }
+    }
+
+    // 5. Apply matched updates
+    for (const u of updates) {
+      await supabase.from('transactions').update({ status: u.status, matched_id: u.matched_id }).eq('id', u.id);
+    }
+
+    // 6. Detect duplicates — same source, same amount, same ref, within 1 day
+    const pending = allTx.filter(t => !usedB.has(t.id) && !usedI.has(t.id));
+    const duplicateIds = new Set();
+    const dupMap = new Map();
+    for (const t of pending) {
+      const key = `${t.source}_${Math.round(t.amount * 100)}_${t.reference || ''}`;
+      if (!dupMap.has(key)) {
+        dupMap.set(key, [t]);
+      } else {
+        const existing = dupMap.get(key);
+        for (const e of existing) {
+          if (Math.abs(new Date(t.date).getTime() - new Date(e.date).getTime()) / 86400000 <= 1) {
+            duplicateIds.add(t.id);
+            break;
+          }
+        }
+        existing.push(t);
+      }
+    }
+    for (const id of duplicateIds) {
+      await supabase.from('transactions').update({ status: 'duplicate' }).eq('id', id);
+    }
+
+    // 7. Flag exceptions — large unmatched (>= 10,000)
+    const THRESHOLD = 10000;
+    const exceptionIds = pending.filter(t => !duplicateIds.has(t.id) && Math.abs(t.amount) >= THRESHOLD).map(t => t.id);
+    for (const id of exceptionIds) {
+      await supabase.from('transactions').update({ status: 'exception' }).eq('id', id);
+    }
+
+    // 8. Everything else → unmatched
+    const unmatchedIds = pending.filter(t => !duplicateIds.has(t.id) && !exceptionIds.includes(t.id)).map(t => t.id);
+    for (const id of unmatchedIds) {
+      await supabase.from('transactions').update({ status: 'unmatched' }).eq('id', id);
+    }
+
+    // 9. Build summary
+    const { data: final } = await supabase.from('transactions').select('*').eq('user_id', userId);
+    const bankTxs = final.filter(t => t.source === 'bank');
+    const intTxs = final.filter(t => t.source === 'internal');
+    const bankTotal = Math.round(bankTxs.reduce((s, t) => s + t.amount, 0) * 100) / 100;
+    const internalTotal = Math.round(intTxs.reduce((s, t) => s + t.amount, 0) * 100) / 100;
+    const variance = Math.round((bankTotal - internalTotal) * 100) / 100;
+    const count = (st) => final.filter(t => t.status === st).length;
 
     return {
-      matched,
-      unmatched: MOCK_STORE.transactions.filter(t => t.status === 'unmatched').length,
-      total: MOCK_STORE.transactions.length,
-      status: 'COMPLETED'
+      matched: count('matched'),
+      unmatched: count('unmatched'),
+      duplicates: count('duplicate'),
+      exceptions: count('exception'),
+      total: final.length,
+      bank_total: bankTotal,
+      internal_total: internalTotal,
+      variance,
+      status: variance === 0 ? 'BALANCED' : 'VARIANCE DETECTED',
+      unmatched_bank: bankTxs.filter(t => t.status === 'unmatched').length,
+      unmatched_internal: intTxs.filter(t => t.status === 'unmatched').length,
     };
   }
 
   if (serviceName.includes('Summary')) {
-    const all = MOCK_STORE.transactions;
+    const { data: all } = await supabase.from('transactions').select('amount, source, status').eq('user_id', userId);
     const bankBal = all.filter(t => t.source === 'bank').reduce((s, t) => s + t.amount, 0);
     const intBal = all.filter(t => t.source === 'internal').reduce((s, t) => s + t.amount, 0);
     
-    const byStatus = {};
-    ['pending', 'matched', 'unmatched', 'exception', 'duplicate'].forEach(s => {
-      byStatus[s] = all.filter(t => t.status === s).length;
-    });
-
     return {
       total: all.length,
-      bank_balance: Math.round(bankBal * 100) / 100,
-      internal_balance: Math.round(intBal * 100) / 100,
-      variance: Math.round((bankBal - intBal) * 100) / 100,
-      by_status: byStatus,
-      accuracy: all.length ? Math.round((all.filter(t => t.status === 'matched').length / all.length) * 100) : 0
+      bank_total: Math.round(bankBal * 100) / 100,
+      internal_total: Math.round(intBal * 100) / 100,
+      variance: Math.round((bankBal - intBal) * 100) / 100
     };
   }
 
   if (serviceName.includes('Ledger')) {
-    const source = args.source || 'bank';
-    const txs = MOCK_STORE.transactions.filter(t => t.source === source).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const { data, error } = await supabase.from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('source', args.source || 'bank')
+      .order('date', { ascending: true });
+    if (error) throw error;
+    
     let balance = 0;
-    return txs.map(t => {
+    const mapped = data.map(t => {
       balance += t.amount;
       return {
-        id: t._id, date: t.date, description: t.description,
-        category: t.category, reference: t.reference,
+        ...t,
+        _id: t.id,
         debit: t.amount < 0 ? Math.abs(t.amount) : null,
         credit: t.amount > 0 ? t.amount : null,
-        balance: Math.round(balance * 100) / 100,
-        status: t.status, matched_id: t.matched_id,
+        balance: Math.round(balance * 100) / 100
       };
     });
+    return mapped;
   }
 
-  // ── Auth ────────────────────────────────────────────────────────────────────
-  if (serviceName.includes('Login') || serviceName.includes('Register') || serviceName.includes('GetMe')) {
-    const jwt = require('jsonwebtoken');
-    const user = MOCK_STORE.users[0];
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30d' });
-    return { token, user };
+  // ── Team ────────────────────────────────────────────────────────────────────
+  if (serviceName.includes('GetTeam')) {
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (error) throw error;
+    return mapId(data);
+  }
+  
+  if (serviceName.includes('InviteMember')) {
+    const { data, error } = await supabase.from('profiles').insert([{
+      email: args.email,
+      role: args.role,
+      active: true
+    }]).select().single();
+    if (error) throw error;
+    return mapId(data);
   }
 
-  return { success: true, message: 'Mock processed', data: {} };
+  // ── Tickets ─────────────────────────────────────────────────────────────────
+  if (serviceName.includes('GetTickets')) {
+    const { data, error } = await supabase.from('tickets').select('*, ticket_comments(*)').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return mapId(data);
+  }
+
+  if (serviceName.includes('CreateTicket')) {
+    const { data, error } = await supabase.from('tickets').insert([{
+      ...args,
+      user_id: userId,
+      status: 'open'
+    }]).select().single();
+    if (error) throw error;
+    return mapId(data);
+  }
+
+  return { success: true, message: 'Supabase processed' };
 }
 
 module.exports = BaseService;

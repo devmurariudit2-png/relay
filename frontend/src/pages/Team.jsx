@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Card from "../components/ui/Card.jsx";
@@ -6,29 +7,18 @@ import Spinner from "../components/ui/Spinner.jsx";
 import Tag from "../components/ui/Tag.jsx";
 
 export default function Team({ user, toast }) {
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [invite, setInvite] = useState({ email: "", role: "member" });
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async (signal) => {
-    setLoading(true);
-    try {
-      const response = await API.getTeamMembers({ signal });
-      setMembers(Array.isArray(response) ? response : response.data || response.members || []);
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-      toast(e.message, "error");
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, [toast]);
+  const { data, isLoading: loading, error } = useQuery({
+    queryKey: ['team'],
+    queryFn: () => API.getTeamMembers({})
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
+  if (error) { toast(error.message, "error"); }
+
+  const members = Array.isArray(data) ? data : data?.data || data?.members || [];
 
   const sendInvite = async () => {
     if (!invite.email.trim()) return;
@@ -37,7 +27,7 @@ export default function Team({ user, toast }) {
       await API.inviteTeamMember(invite.email.trim(), invite.role);
       toast("Team invite sent");
       setInvite({ email: "", role: "member" });
-      load();
+      queryClient.invalidateQueries({ queryKey: ['team'] });
     } catch (e) {
       toast(e.message, "error");
     } finally {
@@ -48,7 +38,10 @@ export default function Team({ user, toast }) {
   const changeRole = async (id, role) => {
     try {
       await API.updateTeamMemberRole(id, role);
-      setMembers(prev => prev.map(m => (m._id === id ? { ...m, role } : m)));
+      queryClient.setQueryData(['team'], prev => {
+        const arr = Array.isArray(prev) ? prev : prev?.data || prev?.members || [];
+        return arr.map(m => (m._id === id ? { ...m, role } : m));
+      });
       toast("Role updated");
     } catch (e) {
       toast(e.message, "error");
@@ -59,7 +52,7 @@ export default function Team({ user, toast }) {
     if (!confirm("Remove this team member?")) return;
     try {
       await API.removeTeamMember(id);
-      setMembers(prev => prev.filter(m => m._id !== id));
+      queryClient.invalidateQueries({ queryKey: ['team'] });
       toast("Member removed");
     } catch (e) {
       toast(e.message, "error");

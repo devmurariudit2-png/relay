@@ -114,6 +114,28 @@ router.post('/invite',
   }
 );
 
+/**
+ * @openapi
+ * /team/{id}:
+ *   patch:
+ *     tags: [Team]
+ *     summary: Update team member role (admin only)
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [role]
+ *             properties:
+ *               role: { type: string, enum: [admin, member, viewer] }
+ *     responses:
+ *       200: { description: Role updated }
+ *       401: { description: Unauthorized }
+ *       403: { description: Admin only }
+ */
 // ── PATCH /team/:id — update role ────────────────────────────────────────────
 router.patch('/:id',
   adminOnly,
@@ -130,6 +152,19 @@ router.patch('/:id',
   }
 );
 
+/**
+ * @openapi
+ * /team/{id}:
+ *   delete:
+ *     tags: [Team]
+ *     summary: Remove a team member (admin only)
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Member removed }
+ *       401: { description: Unauthorized }
+ *       403: { description: Admin only }
+ */
 // ── DELETE /team/:id — remove member ────────────────────────────────────────
 router.delete('/:id',
   adminOnly,

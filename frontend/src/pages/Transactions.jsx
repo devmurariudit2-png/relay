@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Spinner from "../components/ui/Spinner.jsx";
@@ -7,8 +8,7 @@ import Card from "../components/ui/Card.jsx";
 import Modal from "../components/ui/Modal.jsx";
 
 export default function Transactions({ user, toast }) {
-  const [txs, setTxs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState({});
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -20,23 +20,24 @@ export default function Transactions({ user, toast }) {
   const [saving, setSaving] = useState(false);
   const [editingTx, setEditingTx] = useState(null);
   const [editForm, setEditForm] = useState({ category: "", note: "" });
-  const [txMeta, setTxMeta] = useState(null);
   const [txPage, setTxPage] = useState(1);
 
-  const load = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const r = await API.getTransactions({ ...filter, search: search || undefined, page, limit: 50 });
-      const items = r.txs || r.data || (Array.isArray(r) ? r : []);
-      setTxs(items);
-      setTxMeta(r.meta || { page: r.page, pages: Math.ceil(r.total / r.limit), total: r.total });
-      setTxPage(page);
-    }
-    catch (e) { toast(e.message, "error"); }
-    finally { setLoading(false); }
-  }, [filter, search, toast]);
+  const { data: r, isLoading: loading, error } = useQuery({
+    queryKey: ['transactions', filter, search, txPage],
+    queryFn: () => API.getTransactions({ ...filter, search: search || undefined, page: txPage, limit: 50 })
+  });
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (error) toast(error.message, "error");
+  }, [error, toast]);
+
+  const txs = r?.txs || r?.data || (Array.isArray(r) ? r : []);
+  const txMeta = r?.meta || (r ? { page: r.page, pages: Math.ceil(r.total / r.limit), total: r.total, hasMore: r.hasMore } : null);
+
+  const load = () => {
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['summary'] });
+  };
 
   const handleAdd = async () => {
     setSaving(true);
@@ -165,9 +166,9 @@ export default function Transactions({ user, toast }) {
           </span>
           <div style={{ display: "flex", gap: 6 }}>
             <button className="btn-ghost" style={{ fontSize: 12, padding: "6px 12px" }}
-              disabled={txMeta.page <= 1} onClick={() => load(txMeta.page - 1)}>← Prev</button>
+              disabled={txPage <= 1} onClick={() => setTxPage(p => p - 1)}>← Prev</button>
             <button className="btn-ghost" style={{ fontSize: 12, padding: "6px 12px" }}
-              disabled={!txMeta.hasMore} onClick={() => load(txMeta.page + 1)}>Next →</button>
+              disabled={!txMeta.hasMore} onClick={() => setTxPage(p => p + 1)}>Next →</button>
           </div>
         </div>
       )}

@@ -1,8 +1,10 @@
 const AuditLog = require('../models/AuditLog');
 const logger   = require('../utils/logger');
 
+const isSupabase = () => !!process.env.SUPABASE_URL;
+
 /**
- * Audit middleware — logs successful mutating actions to AuditLog.
+ * Audit middleware — logs successful mutating actions.
  * Usage: router.post('/', protect, audit('CREATE', 'Transaction'), handler)
  */
 const audit = (action, entity) => async (req, res, next) => {
@@ -16,14 +18,25 @@ const audit = (action, entity) => async (req, res, next) => {
           || (data?._id)
           || null;
 
-        await AuditLog.create({
-          user:     req.user._id,
-          action,
-          entity,
-          entityId: entityId ? String(entityId) : null,
-          details:  { method: req.method, path: req.path, body: sanitizeBody(req.body) },
-          ip:       req.ip,
-        });
+        if (isSupabase()) {
+          const supabase = require('../config/supabase');
+          await supabase.from('audit_logs').insert([{
+            user_id:   req.user.id || req.user._id,
+            action,
+            entity,
+            entity_id: entityId ? String(entityId) : null,
+            details:   { method: req.method, path: req.path, body: sanitizeBody(req.body) },
+          }]);
+        } else {
+          await AuditLog.create({
+            user:     req.user._id,
+            action,
+            entity,
+            entityId: entityId ? String(entityId) : null,
+            details:  { method: req.method, path: req.path, body: sanitizeBody(req.body) },
+            ip:       req.ip,
+          });
+        }
       } catch (err) {
         logger.error('Audit log failed', { error: err.message });
       }
@@ -42,3 +55,4 @@ function sanitizeBody(body) {
 }
 
 module.exports = audit;
+

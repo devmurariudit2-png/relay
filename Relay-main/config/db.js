@@ -6,6 +6,11 @@ async function connectDB() {
   try {
     const uri = process.env.MONGO_URI;
 
+    if (process.env.SUPABASE_URL) {
+      logger.info('Supabase URL detected. Running in Supabase SQL Mode.');
+      return;
+    }
+
     if (!uri) {
       logger.error('MONGO_URI is not set! Cannot connect to database.');
       if (process.env.NODE_ENV === 'production') {

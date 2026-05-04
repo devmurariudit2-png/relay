@@ -1,16 +1,36 @@
 const BaseService = require('../BaseService');
-const Subscription = require('../../models/Subscription');
-const Transaction = require('../../models/Transaction');
+const supabase = require('../../config/supabase');
 
 class GetStatusService extends BaseService {
   async run() {
+    if (process.env.SUPABASE_URL) {
+      const { data: profile } = await supabase.from('profiles')
+        .select('*')
+        .eq('id', this.userId)
+        .single();
+
+      const { count: txCount } = await supabase.from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', this.userId);
+
+      return {
+        tier: profile?.subscription_tier || 'free',
+        status: profile?.subscription_status || 'active',
+        transactionsUsedThisMonth: txCount || 0,
+        transactionLimit: profile?.transaction_limit || 100,
+        currentPeriodEnd: null,
+        stripeCustomerId: profile?.stripe_customer_id || null,
+      };
+    }
+
+    const Subscription = require('../../models/Subscription');
+    const Transaction = require('../../models/Transaction');
     const orgId = this.user.orgId;
     let sub = await Subscription.findOne({ orgId });
     if (!sub) {
       sub = await Subscription.create({ orgId });
     }
 
-    // Dynamically sync transaction count for the current month to prevent drift
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -30,3 +50,4 @@ class GetStatusService extends BaseService {
 }
 
 module.exports = GetStatusService;
+

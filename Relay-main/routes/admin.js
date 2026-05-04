@@ -173,7 +173,7 @@ router.get('/audit',
   [
     query('entity').optional().isString(),
     query('action').optional().isString(),
-    query('userId').optional().isMongoId(),
+    query('userId').optional().isString(),
   ],
   validate,
   async (req, res, next) => {

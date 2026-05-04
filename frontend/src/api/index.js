@@ -1,12 +1,17 @@
+import { supabase } from '../supabase';
+
 const BASE = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : '/api');
 
-const getToken = () => localStorage.getItem('rec_token');
+const getToken = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token;
+};
 
 async function req(method, path, body, isFormData = false, options = {}) {
   if (!BASE) throw new Error('Backend API URL is not configured. Set VITE_API_URL.');
   const headers = {};
   if (!isFormData) headers['Content-Type'] = 'application/json';
-  const token = getToken();
+  const token = await getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   let res;
@@ -24,7 +29,7 @@ async function req(method, path, body, isFormData = false, options = {}) {
   const raw = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401) {
-      localStorage.removeItem('rec_token');
+      await supabase.auth.signOut();
       window.location.href = "/";
     }
     const err = new Error(raw.message || `HTTP ${res.status}`);
@@ -32,7 +37,6 @@ async function req(method, path, body, isFormData = false, options = {}) {
     err.errors = raw.errors || null;
     throw err;
   }
-  // Unwrap standardized { success, data } envelope
   if (raw && typeof raw === 'object' && 'success' in raw)
     return raw.data !== undefined ? raw.data : raw;
   return raw;
@@ -43,24 +47,38 @@ async function reqFull(method, path, params = {}) {
     Object.fromEntries(Object.entries(params).filter(([,v]) => v !== undefined && v !== ''))
   ).toString();
   const headers = { 'Content-Type': 'application/json' };
-  const token = getToken();
+  const token = await getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res  = await fetch(`${BASE}${path}${q ? '?' + q : ''}`, { headers });
   const raw  = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401) {
-      localStorage.removeItem('rec_token');
+      await supabase.auth.signOut();
       window.location.href = "/";
     }
     throw new Error(raw.message || `HTTP ${res.status}`);
   }
-  return raw; // Return full envelope with meta
+  return raw;
 }
 
-// Auth
-export const login          = (email, password) => req('POST', '/auth/login', { email, password });
-export const register       = (name, email, password) => req('POST', '/auth/register', { name, email, password });
-export const getMe          = () => req('GET', '/auth/me');
+// Auth via Supabase
+export const login = async (email, password) => {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data;
+};
+
+export const register = async (name, email, password) => {
+  const { data, error } = await supabase.auth.signUp({
+    email, password,
+    options: { data: { full_name: name } }
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const logout = () => supabase.auth.signOut();
+export const getMe = () => req('GET', '/auth/me');
 export const updateProfile  = (data) => req('PUT', '/auth/profile', data);
 export const changePassword = (cur, np) => req('PUT', '/auth/password', { currentPassword: cur, newPassword: np });
 
@@ -116,12 +134,12 @@ export const createPortalSession   = () => req('POST', '/stripe/portal');
 // Direct fetch wrapper with Auth token for getting raw data (like swagger JSON)
 export const fetchAuth = async (path) => {
   const headers = {};
-  const token = getToken();
+  const token = await getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { headers });
   if (!res.ok) {
     if (res.status === 401) {
-      localStorage.removeItem('rec_token');
+      await supabase.auth.signOut();
       window.location.href = "/";
     }
     throw new Error(`HTTP ${res.status}`);

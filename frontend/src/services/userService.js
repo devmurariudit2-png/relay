@@ -3,6 +3,7 @@
  * Handles all user-related business logic and API interactions
  */
 
+import { supabase } from '../supabase';
 import * as API from '../api/index.js';
 
 class UserService {
@@ -14,11 +15,7 @@ class UserService {
       if (!email || !password) {
         throw new Error('Email and password are required');
       }
-      const response = await API.login(email, password);
-      if (response.token) {
-        localStorage.setItem('rec_token', response.token);
-      }
-      return response;
+      return await API.login(email, password);
     } catch (error) {
       throw this.formatError(error);
     }
@@ -33,13 +30,9 @@ class UserService {
         throw new Error('Name, email, and password are required');
       }
       this.validateEmail(email);
-      this.validatePassword(password);
+      // Removed complex password validation to match Supabase defaults unless needed
       
-      const response = await API.register(name, email, password);
-      if (response.token) {
-        localStorage.setItem('rec_token', response.token);
-      }
-      return response;
+      return await API.register(name, email, password);
     } catch (error) {
       throw this.formatError(error);
     }
@@ -78,7 +71,6 @@ class UserService {
       if (!currentPassword || !newPassword) {
         throw new Error('Current and new passwords are required');
       }
-      this.validatePassword(newPassword);
       return await API.changePassword(currentPassword, newPassword);
     } catch (error) {
       throw this.formatError(error);
@@ -88,23 +80,25 @@ class UserService {
   /**
    * Logout current user
    */
-  logout() {
-    localStorage.removeItem('rec_token');
+  async logout() {
+    await supabase.auth.signOut();
     window.location.href = '/signin';
   }
 
   /**
    * Check if user is authenticated
    */
-  isAuthenticated() {
-    return !!localStorage.getItem('rec_token');
+  async isAuthenticated() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session;
   }
 
   /**
    * Get stored token
    */
-  getToken() {
-    return localStorage.getItem('rec_token');
+  async getToken() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token;
   }
 
   /**

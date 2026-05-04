@@ -20,6 +20,22 @@ const DeleteTicketService = require("../services/tickets/DeleteTicketService");
 
 router.use(protect);
 
+/**
+ * @openapi
+ * /tickets:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: List tickets (paginated + filtered)
+ *     parameters:
+ *       - { in: query, name: page,     schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit,    schema: { type: integer, default: 50 } }
+ *       - { in: query, name: status,   schema: { type: string, enum: [open, in-progress, resolved, closed] } }
+ *       - { in: query, name: priority, schema: { type: string, enum: [low, medium, high, critical] } }
+ *       - { in: query, name: category, schema: { type: string, enum: [bug, feature, billing, access, other] } }
+ *     responses:
+ *       200: { description: Paginated list of tickets }
+ *       401: { description: Unauthorized }
+ */
 // ── GET /tickets — paginated + filterable ────────────────────────────────────
 router.get(
   "/",
@@ -54,6 +70,28 @@ router.get(
   },
 );
 
+/**
+ * @openapi
+ * /tickets:
+ *   post:
+ *     tags: [Tickets]
+ *     summary: Create a new ticket (member or admin)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, description]
+ *             properties:
+ *               title:       { type: string, example: 'Missing invoice' }
+ *               description: { type: string, example: 'Payment not reflected in ledger' }
+ *               priority:    { type: string, enum: [low, medium, high, critical], default: medium }
+ *               category:    { type: string, enum: [bug, feature, billing, access, other], default: other }
+ *     responses:
+ *       201: { description: Ticket created }
+ *       401: { description: Unauthorized }
+ */
 // ── POST /tickets ────────────────────────────────────────────────────────────
 router.post(
   "/",

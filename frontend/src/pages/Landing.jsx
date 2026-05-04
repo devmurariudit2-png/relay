@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Footer from "../components/layout/Footer.jsx";
 import DemoPlayer from "../components/DemoPlayer.jsx";
 
@@ -64,6 +65,7 @@ function HeroDashboardPreview() {
 
 // ── Landing Page ──────────────────────────────────────────────────────────────
 export default function Landing({ onEnter }) {
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [pct, setPct] = useState(0);
 
@@ -110,8 +112,9 @@ export default function Landing({ onEnter }) {
           </div>
           <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-.4px", color: "#111827" }}>Relay</span>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button style={{ background: "transparent", color: "#6B7280", border: "none", fontSize: 14, fontWeight: 500 }} onClick={onEnter}>Sign in</button>
+        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+          <button style={{ background: "transparent", color: "#6B7280", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }} onClick={() => navigate("/app/api-docs")}>Docs</button>
+          <button style={{ background: "transparent", color: "#6B7280", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }} onClick={onEnter}>Sign in</button>
           <button className="btn-primary" style={{ padding: "8px 18px", fontSize: 13 }} onClick={onEnter}>Get started</button>
         </div>
       </nav>

@@ -14,7 +14,7 @@ export default function Footer({ compact = false }) {
               onMouseEnter={e => e.currentTarget.style.color = "#F9FAFB"} onMouseLeave={e => e.currentTarget.style.color = "#9CA3AF"}>{item.l}</a>
           ))}
         </div>
-        <div style={{ fontSize: 11, color: "#6B7280" }}>© 2025 Relay. All rights reserved.</div>
+        <div style={{ fontSize: 11, color: "#6B7280" }}>© 2026 Relay. All rights reserved.</div>
       </footer>
     );
   }
@@ -28,12 +28,12 @@ export default function Footer({ compact = false }) {
           <span style={{ fontSize: 15, fontWeight: 700, color: "#F9FAFB" }}>Relay</span>
         </div>
         <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
-          {[{ l: "Product", href: "#" }, { l: "Pricing", href: "#" }, { l: "Support", href: "#" }].map(item => (
+          {[{ l: "Product", href: "#" }, { l: "Pricing", href: "#" }, { l: "Support", href: "#" }, { l: "Documentation", href: "/app/api-docs" }].map(item => (
             <a key={item.l} href={item.href} style={{ fontSize: 13, color: "#9CA3AF", transition: "color .2s" }}
               onMouseEnter={e => e.currentTarget.style.color = "#F9FAFB"} onMouseLeave={e => e.currentTarget.style.color = "#9CA3AF"}>{item.l}</a>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: "#6B7280" }}>© 2025 Relay. All rights reserved.</div>
+        <div style={{ fontSize: 12, color: "#6B7280" }}>© 2026 Relay. All rights reserved.</div>
       </div>
     </footer>
   );

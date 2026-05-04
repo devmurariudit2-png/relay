@@ -71,9 +71,9 @@ export function useAuth() {
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     setUser(null);
-    userService.logout();
+    await userService.logout();
   }, []);
 
   return {
@@ -83,7 +83,7 @@ export function useAuth() {
     fetchUser,
     login,
     logout,
-    isAuthenticated: userService.isAuthenticated()
+    isAuthenticated: !!user
   };
 }
 
