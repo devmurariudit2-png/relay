@@ -435,25 +435,80 @@ async function handleSupabaseRequest(serviceName, args, context) {
 
   // ── Tickets ─────────────────────────────────────────────────────────────────
   if (serviceName.includes('ListTickets')) {
-    const { data, count, error } = await supabase.from('tickets').select('*, ticket_comments(*)').eq('user_id', userId).order('created_at', { ascending: false });
+    let query = supabase.from('tickets').select('*, ticket_comments(*)');
+    
+    // Admins see all tickets, members only see their own
+    if (context.user?.role !== 'admin') {
+      query = query.eq('user_id', userId);
+    }
+    
+    const { data, count, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return { tickets: mapId(data), total: count, page: 1, limit: 50 };
+
+    const tickets = data.map(t => ({
+      ...t,
+      comments: t.ticket_comments || []
+    }));
+
+    return { tickets: mapId(tickets), total: count, page: 1, limit: 50 };
   }
 
   if (serviceName.includes('GetTicket')) {
-    const { data, error } = await supabase.from('tickets').select('*, ticket_comments(*)').eq('id', args.id).eq('user_id', userId).single();
+    let query = supabase.from('tickets').select('*, ticket_comments(*)').eq('id', args.id);
+    
+    if (context.user?.role !== 'admin') {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query.single();
     if (error) throw error;
-    return mapId(data);
+    
+    const ticket = {
+      ...data,
+      comments: data.ticket_comments || []
+    };
+
+    return mapId(ticket);
   }
 
   if (serviceName.includes('UpdateTicket')) {
-    const { data, error } = await supabase.from('tickets').update(args).eq('id', args.id).eq('user_id', userId).select().single();
-    if (error) throw error;
-    return mapId(data);
+    const { id, comment, ...updates } = args;
+    
+    // 1. Handle Comment if present
+    if (comment) {
+      await supabase.from('ticket_comments').insert([{
+        ticket_id: id,
+        user_id: userId,
+        message: comment
+      }]);
+    }
+
+    // 2. Handle status/priority updates
+    if (Object.keys(updates).length > 0) {
+      let query = supabase.from('tickets').update(updates).eq('id', id);
+      
+      // Admins can update any ticket, members only their own
+      if (context.user?.role !== 'admin') {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query.select().single();
+      if (error) throw error;
+      return mapId(data);
+    }
+
+    // If only a comment was added, return the updated ticket with comments
+    return handleSupabaseRequest('GetTicket', { id }, context);
   }
 
   if (serviceName.includes('DeleteTicket')) {
-    const { error } = await supabase.from('tickets').delete().eq('id', args.id).eq('user_id', userId);
+    let query = supabase.from('tickets').delete().eq('id', args.id);
+    
+    if (context.user?.role !== 'admin') {
+      query = query.eq('user_id', userId);
+    }
+
+    const { error } = await query;
     if (error) throw error;
     return { success: true };
   }

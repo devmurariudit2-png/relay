@@ -56,11 +56,23 @@ CREATE TABLE IF NOT EXISTS public.tickets (
   user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
+  category TEXT DEFAULT 'other',
   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
-  priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+  priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 4.1 Ticket Comments
+CREATE TABLE IF NOT EXISTS public.ticket_comments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  ticket_id UUID REFERENCES public.tickets(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES auth.users ON DELETE SET NULL,
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.ticket_comments ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
 
@@ -203,6 +215,27 @@ CREATE POLICY "Users can update their own tickets" ON public.tickets
 DROP POLICY IF EXISTS "Admins can manage all tickets" ON public.tickets;
 CREATE POLICY "Admins can manage all tickets" ON public.tickets
   FOR ALL USING (public.is_admin());
+
+-- 4.1 Ticket Comments Policies
+DROP POLICY IF EXISTS "Users can view comments on their tickets" ON public.ticket_comments;
+CREATE POLICY "Users can view comments on their tickets" ON public.ticket_comments
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.tickets
+      WHERE id = ticket_comments.ticket_id
+      AND (user_id = auth.uid() OR public.is_admin())
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can add comments to their tickets" ON public.ticket_comments;
+CREATE POLICY "Users can add comments to their tickets" ON public.ticket_comments
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.tickets
+      WHERE id = ticket_comments.ticket_id
+      AND (user_id = auth.uid() OR public.is_admin())
+    )
+  );
 
 -- 5. Subscriptions Policies
 DROP POLICY IF EXISTS "Users can view their own subscription" ON public.subscriptions;

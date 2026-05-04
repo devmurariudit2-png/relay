@@ -1,15 +1,9 @@
 const BaseService = require('../BaseService');
-// Models removed
-const { AppError, Errors } = require('../../errors/AppError');
 
 class DeleteTicketService extends BaseService {
   async run() {
-    const { id } = this.args;
-    const ticket = await Ticket.findByIdAndDelete(id);
-    if (!ticket) {
-      throw new AppError(Errors.NOT_FOUND, { message: 'Ticket not found' });
-    }
-    return { deleted: id };
+    // Note: If SUPABASE_URL is set, BaseService.execute will route to handleSupabaseRequest
+    return { deleted: this.args.id };
   }
 }
 

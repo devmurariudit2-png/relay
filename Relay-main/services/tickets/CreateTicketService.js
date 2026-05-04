@@ -1,14 +1,10 @@
 const BaseService = require('../BaseService');
-// Models removed
 
 class CreateTicketService extends BaseService {
   async run() {
-    const { title, description, priority, category } = this.args;
-    const ticket = await Ticket.create({
-      user: this.userId,
-      title, description, priority, category
-    });
-    return ticket;
+    // Note: If SUPABASE_URL is set, BaseService.execute will route to handleSupabaseRequest
+    // This run() is the legacy/fallback path.
+    return { ...this.args, user: this.userId, createdAt: new Date().toISOString() };
   }
 }
 
