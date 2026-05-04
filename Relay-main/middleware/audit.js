@@ -1,5 +1,5 @@
-const AuditLog = require('../models/AuditLog');
 const logger   = require('../utils/logger');
+const supabase = require('../config/supabase');
 
 const isSupabase = () => !!process.env.SUPABASE_URL;
 
@@ -19,7 +19,6 @@ const audit = (action, entity) => async (req, res, next) => {
           || null;
 
         if (isSupabase()) {
-          const supabase = require('../config/supabase');
           await supabase.from('audit_logs').insert([{
             user_id:   req.user.id || req.user._id,
             action,
@@ -28,6 +27,8 @@ const audit = (action, entity) => async (req, res, next) => {
             details:   { method: req.method, path: req.path, body: sanitizeBody(req.body) },
           }]);
         } else {
+          // Legacy MongoDB fallback
+          const AuditLog = require('../models/AuditLog');
           await AuditLog.create({
             user:     req.user._id,
             action,
@@ -55,4 +56,3 @@ function sanitizeBody(body) {
 }
 
 module.exports = audit;
-

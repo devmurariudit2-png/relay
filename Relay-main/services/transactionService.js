@@ -1,11 +1,15 @@
 const Transaction = require('../models/Transaction');
 const jobService = require('./jobService');
 
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const buildTransactionFilter = (userId, query) => {
   const filter = { user: userId };
   if (query.source) filter.source = query.source;
   if (query.status) filter.status = query.status;
-  if (query.category) filter.category = new RegExp(query.category, 'i');
+  if (query.category) filter.category = new RegExp(escapeRegExp(query.category), 'i');
 
   if (query.dateFrom || query.dateTo) {
     filter.date = {};
@@ -14,10 +18,11 @@ const buildTransactionFilter = (userId, query) => {
   }
 
   if (query.search) {
+    const escapedSearch = escapeRegExp(query.search);
     filter.$or = [
-      { description: new RegExp(query.search, 'i') },
-      { reference: new RegExp(query.search, 'i') },
-      { category: new RegExp(query.search, 'i') },
+      { description: new RegExp(escapedSearch, 'i') },
+      { reference: new RegExp(escapedSearch, 'i') },
+      { category: new RegExp(escapedSearch, 'i') },
     ];
   }
 

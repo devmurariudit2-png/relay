@@ -6,6 +6,10 @@ const supabase = require('../config/supabase');
 
 const isSupabase = () => !!process.env.SUPABASE_URL;
 
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const listUsers = async (query) => {
   if (isSupabase()) {
     const page = query.page || 1;
@@ -37,9 +41,10 @@ const listUsers = async (query) => {
   if (query.role) filter.role = query.role;
   if (query.active !== undefined) filter.active = query.active === 'true';
   if (query.search) {
+    const escapedSearch = escapeRegExp(query.search);
     filter.$or = [
-      { name: new RegExp(query.search, 'i') },
-      { email: new RegExp(query.search, 'i') },
+      { name: new RegExp(escapedSearch, 'i') },
+      { email: new RegExp(escapedSearch, 'i') },
     ];
   }
 
@@ -250,8 +255,8 @@ const auditLogs = async (query) => {
   const skip = (page - 1) * limit;
 
   const filter = {};
-  if (query.entity) filter.entity = new RegExp(query.entity, 'i');
-  if (query.action) filter.action = new RegExp(query.action, 'i');
+  if (query.entity) filter.entity = new RegExp(escapeRegExp(query.entity), 'i');
+  if (query.action) filter.action = new RegExp(escapeRegExp(query.action), 'i');
   if (query.userId) filter.user = query.userId;
 
   const [logs, total] = await Promise.all([
