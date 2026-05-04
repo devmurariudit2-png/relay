@@ -21,18 +21,7 @@ export default function Team({ user, toast }) {
   const members = Array.isArray(data) ? data : data?.data || data?.members || [];
 
   const sendInvite = async () => {
-    if (!invite.email.trim()) return;
-    setSaving(true);
-    try {
-      await API.inviteTeamMember(invite.email.trim(), invite.role);
-      toast("Team invite sent");
-      setInvite({ email: "", role: "member" });
-      queryClient.invalidateQueries({ queryKey: ['team'] });
-    } catch (e) {
-      toast(e.message, "error");
-    } finally {
-      setSaving(false);
-    }
+    toast("Team Invites are handled via Supabase Dashboard (Phase 2 Roadmap Feature)", "error");
   };
 
   const changeRole = async (id, role) => {

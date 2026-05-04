@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "../supabase.js";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
 import Card from "../components/ui/Card.jsx";
@@ -20,7 +21,13 @@ export default function Settings({ user, setUser, toast }) {
 
   const changePw = async () => {
     setSavingPw(true);
-    try { await API.changePassword(cur, np); toast("Password changed"); setCur(""); setNp(""); }
+    try { 
+      const { error } = await supabase.auth.updateUser({ password: np });
+      if (error) throw error;
+      toast("Password changed"); 
+      setCur(""); 
+      setNp(""); 
+    }
     catch (e) { toast(e.message, "error"); }
     finally { setSavingPw(false); }
   };
