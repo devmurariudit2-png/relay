@@ -33,6 +33,9 @@ jobs:
 
       - name: Run Backend Tests
         run: npm test -w Relay-main
+        env:
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_SERVICE_ROLE_KEY: dummy_key
 
   deploy-database:
     name: Push Database Migrations
