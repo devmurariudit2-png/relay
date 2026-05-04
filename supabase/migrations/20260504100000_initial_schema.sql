@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS public.stripe_events (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ── SECURITY HELPERS ──────────────────────────────────────────────────────────
+-- ── SECURITY HELPERS & TRIGGERS ────────────────────────────────────────────────
 
 -- Function to check if the current user is an admin without recursion
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -118,6 +118,20 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER trigger_protect_role
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.protect_role_escalation();
+
+-- Trigger to automatically create a profile for new users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, role)
+  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name', 'member');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ── RLS POLICIES ─────────────────────────────────────────────────────────────
 
