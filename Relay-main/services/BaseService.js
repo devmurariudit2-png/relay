@@ -150,8 +150,8 @@ async function handleSupabaseRequest(serviceName, args, context) {
   
   const mapId = (obj) => {
     if (!obj) return obj;
-    if (Array.isArray(obj)) return obj.map(o => ({ ...o, _id: o.id, createdAt: o.created_at }));
-    return { ...obj, _id: obj.id, createdAt: obj.created_at };
+    if (Array.isArray(obj)) return obj.map(o => ({ ...o, _id: o.id, name: o.full_name, createdAt: o.created_at }));
+    return { ...obj, _id: obj.id, name: obj.full_name, createdAt: obj.created_at };
   };
 
   // ── Transactions ────────────────────────────────────────────────────────────
@@ -274,58 +274,6 @@ async function handleSupabaseRequest(serviceName, args, context) {
       unmatched_bank: bankTxs.filter(t => t.status === 'unmatched').length,
       unmatched_internal: intTxs.filter(t => t.status === 'unmatched').length,
     };
-  }
-
-  if (serviceName.includes('Summary')) {
-    const { data: all } = await supabase.from('transactions').select('amount, source, status, category').eq('user_id', userId);
-    if (!all) return { total: 0, bank_balance: 0, internal_balance: 0, variance: 0, by_status: {}, by_category: {} };
-
-    const bankBal = all.filter(t => t.source === 'bank').reduce((s, t) => s + t.amount, 0);
-    const intBal = all.filter(t => t.source === 'internal').reduce((s, t) => s + t.amount, 0);
-    
-    const byStatus = {};
-    ['pending', 'matched', 'unmatched', 'exception', 'duplicate'].forEach(s => {
-      byStatus[s] = all.filter(t => t.status === s).length;
-    });
-
-    const byCategory = {};
-    all.forEach(t => {
-      if (!t.category) return;
-      if (!byCategory[t.category]) byCategory[t.category] = { count: 0, total: 0 };
-      byCategory[t.category].count++;
-      byCategory[t.category].total = Math.round((byCategory[t.category].total + t.amount) * 100) / 100;
-    });
-
-    return {
-      total: all.length,
-      bank_balance: Math.round(bankBal * 100) / 100,
-      internal_balance: Math.round(intBal * 100) / 100,
-      variance: Math.round((bankBal - intBal) * 100) / 100,
-      by_status: byStatus,
-      by_category: byCategory
-    };
-  }
-
-  if (serviceName.includes('Ledger')) {
-    const { data, error } = await supabase.from('transactions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('source', args.source || 'bank')
-      .order('date', { ascending: true });
-    if (error) throw error;
-    
-    let balance = 0;
-    const mapped = data.map(t => {
-      balance += t.amount;
-      return {
-        ...t,
-        _id: t.id,
-        debit: t.amount < 0 ? Math.abs(t.amount) : null,
-        credit: t.amount > 0 ? t.amount : null,
-        balance: Math.round(balance * 100) / 100
-      };
-    });
-    return mapped;
   }
 
   // ── Team ────────────────────────────────────────────────────────────────────

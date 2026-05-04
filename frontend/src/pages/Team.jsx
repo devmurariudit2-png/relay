@@ -10,14 +10,16 @@ export default function Team({ user, toast }) {
   const [invite, setInvite] = useState({ email: "", role: "member" });
   const [saving, setSaving] = useState(false);
 
-  const { data, isLoading: loading, error } = useQuery({
+  const { data: r, isLoading: loading, error } = useQuery({
     queryKey: ['team'],
     queryFn: () => API.getTeamMembers({})
   });
 
-  if (error) { toast(error.message, "error"); }
+  useEffect(() => {
+    if (error) toast(error.message, "error");
+  }, [error, toast]);
 
-  const members = Array.isArray(data) ? data : data?.data || data?.members || [];
+  const members = r?.data || (Array.isArray(r) ? r : []) || [];
 
   const sendInvite = async () => {
     toast("Team Invites are handled via Supabase Dashboard (Phase 2 Roadmap Feature)", "error");
