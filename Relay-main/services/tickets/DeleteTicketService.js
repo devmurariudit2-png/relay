@@ -1,9 +1,17 @@
 const BaseService = require('../BaseService');
+const supabase = require('../../config/supabase');
 
 class DeleteTicketService extends BaseService {
   async run() {
-    // Note: If SUPABASE_URL is set, BaseService.execute will route to handleSupabaseRequest
-    return { deleted: this.args.id };
+    let query = supabase.from('tickets').delete().eq('id', this.args.id);
+    
+    if (this.user?.role !== 'admin') {
+      query = query.eq('user_id', this.userId);
+    }
+
+    const { error } = await query;
+    if (error) throw error;
+    return { success: true };
   }
 }
 

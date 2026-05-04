@@ -1,10 +1,18 @@
 const BaseService = require('../BaseService');
+const supabase = require('../../config/supabase');
 
 class CreateTicketService extends BaseService {
   async run() {
-    // Note: If SUPABASE_URL is set, BaseService.execute will route to handleSupabaseRequest
-    // This run() is the legacy/fallback path.
-    return { ...this.args, user: this.userId, createdAt: new Date().toISOString() };
+    const { data, error } = await supabase.from('tickets').insert([{
+      ...this.args,
+      user_id: this.userId,
+      status: 'open'
+    }]).select().single();
+
+    if (error) throw error;
+    
+    // mapId logic
+    return { ...data, _id: data.id };
   }
 }
 
