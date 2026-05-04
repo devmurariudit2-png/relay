@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const Ticket = require("../models/Ticket");
-const { protect, memberOrAdmin, adminOnly } = require("../middleware/auth");
+const { protect, memberOrAdmin, adminOnly } = require("../middleware/supabaseAuth");
 const audit = require("../middleware/audit");
 const R = require("../utils/response");
 const {
