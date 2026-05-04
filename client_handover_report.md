@@ -47,6 +47,7 @@ Relay is now an "API-First" platform, ready for external developers and complex 
 - **Audit Trails**: Every mutating action (Create/Update/Delete) is logged with a trace ID, user ID, and timestamp.
 - **Rate Limiting**: Protection against brute-force attacks on auth endpoints and resource exhaustion on import endpoints.
 - **Trace IDs**: End-to-end request tracking. If a user encounters an error, the trace ID in their browser matches exactly with the backend log for rapid debugging.
+- **Production Monitoring (Recommendation)**: For Day 2 operations, we strongly recommend integrating **Sentry** for real-time frontend/backend error tracking and **Datadog or Logtail** for centralized log aggregation. This eliminates the need to SSH into servers to trace issues like failed Stripe webhooks or reconciliation job drops.
 
 ---
 
