@@ -378,7 +378,7 @@ export default function ApiDocs({ user, toast }) {
                     {copied ? "✓ Copied" : "Copy"}
                   </button>
                 </div>
-                <pre className="text-[13px] font-mono text-[#33FF00] overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
+                <pre className="text-[13px] font-mono text-gray-300 overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
                   {generateCurl(activeItem.data.path, activeItem.data.method, activeItem.data.spec)}
                 </pre>
               </div>
@@ -387,7 +387,7 @@ export default function ApiDocs({ user, toast }) {
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">Response (JSON)</h4>
                 </div>
-                <pre className="text-[13px] font-mono text-[#66B2FF] overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
+                <pre className="text-[13px] font-mono text-gray-300 overflow-x-auto p-5 bg-[#111318] rounded-xl border border-gray-800 whitespace-pre-wrap leading-relaxed shadow-inner">
                   {generateResponse(activeItem.data.spec, activeItem.data.method)}
                 </pre>
               </div>

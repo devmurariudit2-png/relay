@@ -48,6 +48,7 @@ const swaggerDefinition = {
     { name: 'Team',         description: 'Team / organization management' },
     { name: 'Admin',        description: 'Admin-only operations' },
     { name: 'Stripe',       description: 'Subscription & payment management' },
+    { name: 'Jobs',         description: 'Background job monitoring' },
     { name: 'System',       description: 'Health & system endpoints' },
   ],
 };

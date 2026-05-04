@@ -7,6 +7,17 @@
 
 /**
  * @openapi
+ * /:
+ *   get:
+ *     tags: [System]
+ *     summary: API Root Information
+ *     description: Returns basic service information and versioning.
+ *     security: []
+ *     responses:
+ *       200: { description: API info }
+ */
+/**
+ * @openapi
  * /health:
  *   get:
  *     tags: [System]

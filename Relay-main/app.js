@@ -91,6 +91,7 @@ app.use('/tickets', require('./routes/tickets'));
 app.use('/team', require('./routes/team'));
 app.use('/admin', require('./routes/admin'));
 app.use('/stripe', require('./routes/stripe'));
+app.use('/jobs', require('./routes/jobs'));
 
 // errors
 app.use(notFoundHandler);

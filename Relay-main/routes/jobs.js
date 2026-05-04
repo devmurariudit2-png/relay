@@ -5,6 +5,19 @@ const R = require('../utils/response');
 
 router.use(protect);
 
+/**
+ * @openapi
+ * /jobs/{id}:
+ *   get:
+ *     tags: [Jobs]
+ *     summary: Get background job status
+ *     description: Retrieve the current state (pending, processing, completed, failed) of a background job by its UUID.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string }, description: 'Job UUID' }
+ *     responses:
+ *       200: { description: Job status object }
+ *       404: { description: Job not found }
+ */
 // GET /jobs/:id
 router.get('/:id', async (req, res, next) => {
   try {
