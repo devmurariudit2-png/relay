@@ -43,7 +43,7 @@ router.get(
   [
     query("status")
       .optional()
-      .isIn(["open", "in-progress", "resolved", "closed"]),
+      .isIn(["open", "in_progress", "resolved", "closed"]),
     query("priority").optional().isIn(["low", "medium", "high", "critical"]),
     query("category")
       .optional()

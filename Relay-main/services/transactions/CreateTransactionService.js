@@ -1,38 +1,55 @@
 const BaseService = require('../BaseService');
-// Models removed
-// Models removed
+const supabase = require('../../config/supabase');
 const { AppError, Errors } = require('../../errors/AppError');
 
-const LIMITS = { free: 10000, starter: 50000, growth: 250000, scale: 1000000, enterprise: Infinity };
+const LIMITS = { free: 50, starter: 5000, growth: 25000, scale: 100000, enterprise: Infinity };
 
 class CreateTransactionService extends BaseService {
   async run() {
     const { date, description, amount, currency, reference, source, category, note } = this.args;
-    
-    // Check Subscription Limit
-    let sub = await Subscription.findOne({ orgId: this.user.orgId });
-    if (!sub) sub = await Subscription.create({ orgId: this.user.orgId });
+    const userId = this.userId;
 
-    // Reset usage if it's a new month (simplified check)
-    const now = new Date();
-    if (sub.updatedAt && sub.updatedAt.getMonth() !== now.getMonth()) {
-      sub.transactionsUsedThisMonth = 0;
+    // 1. Check Subscription Limit (Simplified for migration)
+    const { data: sub } = await supabase
+      .from('subscriptions')
+      .select('plan_id')
+      .eq('user_id', userId)
+      .single();
+
+    const plan = sub?.plan_id || 'free';
+    const limit = LIMITS[plan];
+
+    // Count this month's transactions
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const { count } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', startOfMonth.toISOString());
+
+    if (count >= limit) {
+      throw new AppError(Errors.PAYMENT_REQUIRED, { 
+        message: `Transaction limit reached for ${plan} plan (${limit}/month). Please upgrade.` 
+      });
     }
 
-    const limit = LIMITS[sub.tier] || 50;
-    if (sub.transactionsUsedThisMonth >= limit) {
-      throw new AppError(Errors.PAYMENT_REQUIRED, { message: `Transaction limit reached for ${sub.tier} tier (${limit}/month). Please upgrade.` });
-    }
+    // 2. Create Transaction
+    const { data: tx, error } = await supabase
+      .from('transactions')
+      .insert([{
+        user_id: userId,
+        date, description, amount, currency, reference, source, category, note,
+        status: 'pending'
+      }])
+      .select()
+      .single();
 
-    const tx = await Transaction.create({
-      user: this.user, orgId: this.user.orgId,
-      date, description, amount, currency, reference, source, category, note,
-    });
+    if (error) throw error;
 
-    sub.transactionsUsedThisMonth += 1;
-    await sub.save();
-
-    return tx;
+    return { ...tx, _id: tx.id, createdAt: tx.created_at };
   }
 }
 

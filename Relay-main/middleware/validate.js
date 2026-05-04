@@ -58,7 +58,7 @@ const ticketRules = [
 ];
 
 const ticketPatchRules = [
-  body('status').optional().isIn(['open', 'in-progress', 'resolved', 'closed']).withMessage('Invalid status'),
+  body('status').optional().isIn(['open', 'in_progress', 'resolved', 'closed']).withMessage('Invalid status'),
   body('priority').optional().isIn(['low', 'medium', 'high', 'critical']).withMessage('Invalid priority'),
   body('comment').optional().trim().isLength({ min: 1, max: 2000 }).withMessage('Comment must be 1–2000 chars'),
   body('assignedTo').optional().isString().withMessage('Invalid assignedTo ID'),
@@ -78,7 +78,7 @@ const roleUpdateRules = [
 const mongoIdParam = (field = 'id') => {
   if (process.env.SUPABASE_URL) {
     // Accept UUIDs for Supabase mode
-    return param(field).isString().notEmpty().withMessage(`${field} is required`);
+    return param(field).isUUID().withMessage(`${field} must be a valid UUID`);
   }
   return param(field).isMongoId().withMessage(`${field} must be a valid MongoDB ID`);
 };

@@ -40,11 +40,27 @@ class BaseService {
     }
 
     try {
+      const instance = new this(args, context);
+
+      // ✅ PREFER CUSTOM SERVICE IMPLEMENTATION OVER MONOLITHIC HANDLER
+      if (instance.run !== BaseService.prototype.run) {
+        const result = await instance.run();
+        
+        if (context && context.logger) {
+          context.logger.info(`[${serviceName}] Completed`, {
+            traceId: context.traceId,
+            duration: `${Date.now() - startTime}ms`,
+            result: sanitizeResult(result),
+          });
+        }
+        return result;
+      }
+
+      // Fallback to monolithic Supabase handler for legacy support during migration
       if (process.env.SUPABASE_URL) {
         return await handleSupabaseRequest(serviceName, args, context);
       }
 
-      const instance = new this(args, context);
       const result = await instance.run();
 
       if (context && context.logger) {
@@ -134,120 +150,11 @@ async function handleSupabaseRequest(serviceName, args, context) {
   
   const mapId = (obj) => {
     if (!obj) return obj;
-    if (Array.isArray(obj)) return obj.map(o => ({ ...o, _id: o.id }));
-    return { ...obj, _id: obj.id };
+    if (Array.isArray(obj)) return obj.map(o => ({ ...o, _id: o.id, createdAt: o.created_at }));
+    return { ...obj, _id: obj.id, createdAt: obj.created_at };
   };
 
   // ── Transactions ────────────────────────────────────────────────────────────
-  if (serviceName.includes('ListTransactions')) {
-    let query = supabase.from('transactions').select('*', { count: 'exact' });
-    
-    if (userId) query = query.eq('user_id', userId);
-    if (args.source) query = query.eq('source', args.source);
-    if (args.status) query = query.eq('status', args.status);
-    if (args.search) query = query.ilike('description', `%${args.search}%`);
-    
-    const { data, count, error } = await query.order('date', { ascending: false });
-    if (error) throw error;
-    
-    return {
-      transactions: mapId(data),
-      page: 1, limit: 50, total: count, pages: 1
-    };
-  }
-
-  if (serviceName.includes('GetTransaction')) {
-    const { data, error } = await supabase.from('transactions').select('*').eq('id', args.id).eq('user_id', userId).single();
-    if (error) throw error;
-    return mapId(data);
-  }
-
-  if (serviceName.includes('CreateTransaction')) {
-    const { data, error } = await supabase.from('transactions').insert([{
-      ...args,
-      user_id: userId,
-      status: 'pending'
-    }]).select().single();
-    if (error) throw error;
-    return mapId(data);
-  }
-
-  if (serviceName.includes('ImportCsv')) {
-    let rows;
-    try {
-      rows = parse(args.fileBuffer, { 
-        columns: header => header.map(h => h.toLowerCase().trim()),
-        skip_empty_lines: true, 
-        trim: true 
-      });
-    } catch (err) {
-      throw new AppError(Errors.BAD_REQUEST, { message: `CSV Parse Error: ${err.message}` });
-    }
-    
-    if (!rows || rows.length === 0) {
-      return { imported: 0, source: args.source };
-    }
-
-    const docs = rows.map((r, i) => {
-      // Robust amount parsing: remove currency symbols and commas
-      let rawAmt = String(r.amount || '0').replace(/[$,]/g, '');
-      const amount = parseFloat(rawAmt);
-
-      // Simple date normalization (handle DD/MM/YYYY or MM/DD/YYYY to YYYY-MM-DD if possible)
-      let date = r.date;
-      if (date && date.includes('/')) {
-        const parts = date.split('/');
-        if (parts.length === 3) {
-          if (parts[2].length === 4) { // DD/MM/YYYY or MM/DD/YYYY
-             // Assume ISO-ish for now or try to reformat
-             // This is a guess, but YYYY-MM-DD is safest for PG
-             if (parseInt(parts[0]) > 12) { // DD/MM/YYYY
-               date = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-             } else { // MM/DD/YYYY
-               date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-             }
-          }
-        }
-      }
-
-      return {
-        date: date || new Date().toISOString().split('T')[0],
-        description: r.description || `Imported transaction ${i+1}`,
-        amount: isNaN(amount) ? 0 : amount,
-        currency: (r.currency || 'USD').toUpperCase(),
-        reference: r.reference || r.ref || null,
-        category: r.category || null,
-        source: args.source || 'bank',
-        status: 'pending',
-        user_id: userId
-      };
-    });
-
-    const { data, error } = await supabase.from('transactions').insert(docs).select();
-    if (error) {
-      console.error('Supabase Import Error:', error);
-      throw error;
-    }
-    return { imported: (data || []).length, source: args.source };
-  }
-
-  if (serviceName.includes('DeleteTransaction')) {
-    const { error } = await supabase.from('transactions').delete().eq('id', args.id).eq('user_id', userId);
-    if (error) throw error;
-    return { success: true };
-  }
-
-  if (serviceName.includes('UpdateTransaction')) {
-    const { data, error } = await supabase.from('transactions')
-      .update(args)
-      .eq('id', args.id)
-      .eq('user_id', userId)
-      .select()
-      .single();
-    if (error) throw error;
-    return mapId(data);
-  }
-
   if (serviceName.includes('Reconcile')) {
     // 1. Reset all user transactions to pending
     await supabase.from('transactions').update({ status: 'pending', matched_id: null }).eq('user_id', userId);
@@ -370,15 +277,32 @@ async function handleSupabaseRequest(serviceName, args, context) {
   }
 
   if (serviceName.includes('Summary')) {
-    const { data: all } = await supabase.from('transactions').select('amount, source, status').eq('user_id', userId);
+    const { data: all } = await supabase.from('transactions').select('amount, source, status, category').eq('user_id', userId);
+    if (!all) return { total: 0, bank_balance: 0, internal_balance: 0, variance: 0, by_status: {}, by_category: {} };
+
     const bankBal = all.filter(t => t.source === 'bank').reduce((s, t) => s + t.amount, 0);
     const intBal = all.filter(t => t.source === 'internal').reduce((s, t) => s + t.amount, 0);
     
+    const byStatus = {};
+    ['pending', 'matched', 'unmatched', 'exception', 'duplicate'].forEach(s => {
+      byStatus[s] = all.filter(t => t.status === s).length;
+    });
+
+    const byCategory = {};
+    all.forEach(t => {
+      if (!t.category) return;
+      if (!byCategory[t.category]) byCategory[t.category] = { count: 0, total: 0 };
+      byCategory[t.category].count++;
+      byCategory[t.category].total = Math.round((byCategory[t.category].total + t.amount) * 100) / 100;
+    });
+
     return {
       total: all.length,
-      bank_total: Math.round(bankBal * 100) / 100,
-      internal_total: Math.round(intBal * 100) / 100,
-      variance: Math.round((bankBal - intBal) * 100) / 100
+      bank_balance: Math.round(bankBal * 100) / 100,
+      internal_balance: Math.round(intBal * 100) / 100,
+      variance: Math.round((bankBal - intBal) * 100) / 100,
+      by_status: byStatus,
+      by_category: byCategory
     };
   }
 
@@ -447,7 +371,7 @@ async function handleSupabaseRequest(serviceName, args, context) {
 
     const tickets = data.map(t => ({
       ...t,
-      comments: t.ticket_comments || []
+      comments: (t.ticket_comments || []).map(c => ({ ...c, _id: c.id, createdAt: c.created_at }))
     }));
 
     return { tickets: mapId(tickets), total: count, page: 1, limit: 50 };
@@ -465,7 +389,7 @@ async function handleSupabaseRequest(serviceName, args, context) {
     
     const ticket = {
       ...data,
-      comments: data.ticket_comments || []
+      comments: (data.ticket_comments || []).map(c => ({ ...c, _id: c.id, createdAt: c.created_at }))
     };
 
     return mapId(ticket);

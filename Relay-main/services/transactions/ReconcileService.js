@@ -1,124 +1,139 @@
 const BaseService = require('../BaseService');
-// Models removed
+const supabase = require('../../config/supabase');
 
 class ReconcileService extends BaseService {
   async run() {
-    // ── 1. Reset all to pending ───────────────────────────────────────────────
-    await Transaction.updateMany(
-      { user: this.userId },
-      { $set: { status: 'pending', matched_id: null } }
-    );
+    const userId = this.userId;
+    if (!userId) throw new Error("User ID is required for reconciliation");
 
-    const bank = await Transaction.find({ user: this.userId, source: 'bank' });
-    const internal = await Transaction.find({ user: this.userId, source: 'internal' });
+    // ── 1. Reset all user transactions to pending ──────────────────────────────
+    await supabase.from('transactions')
+      .update({ status: 'pending', matched_id: null })
+      .eq('user_id', userId);
 
+    // ── 2. Fetch all transactions ──────────────────────────────────────────────
+    const { data: allTx, error } = await supabase.from('transactions')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    if (!allTx || allTx.length === 0) {
+      return { matched: 0, unmatched: 0, duplicates: 0, exceptions: 0, total: 0, bank_total: 0, internal_total: 0, variance: 0, status: 'BALANCED', unmatched_bank: 0, unmatched_internal: 0 };
+    }
+
+    const bank = allTx.filter(t => t.source === 'bank');
+    const internal = allTx.filter(t => t.source === 'internal');
     const usedB = new Set();
     const usedI = new Set();
-    const updates = [];
+    const updates = []; // { id, status, matched_id }
 
-    // ── 2. Pass 1 — exact reference + exact amount ────────────────────────────
+    // ── 3. Pass 1 — exact reference + exact amount ─────────────────────────────
+    const internalByRef = new Map();
+    for (const i of internal) {
+      if (!i.reference) continue;
+      if (!internalByRef.has(i.reference)) internalByRef.set(i.reference, []);
+      internalByRef.get(i.reference).push(i);
+    }
+
     for (const b of bank) {
-      if (!b.reference || usedB.has(String(b._id))) continue;
-      for (const i of internal) {
-        if (usedI.has(String(i._id))) continue;
-        if (i.reference === b.reference && Math.abs(i.amount - b.amount) < 0.01) {
-          updates.push({ id: b._id, status: 'matched', matched_id: i._id });
-          updates.push({ id: i._id, status: 'matched', matched_id: b._id });
-          usedB.add(String(b._id));
-          usedI.add(String(i._id));
+      if (!b.reference || usedB.has(b.id)) continue;
+      const candidates = internalByRef.get(b.reference);
+      if (!candidates) continue;
+      for (const i of candidates) {
+        if (usedI.has(i.id)) continue;
+        if (Math.abs(i.amount - b.amount) < 0.01) {
+          updates.push({ id: b.id, status: 'matched', matched_id: i.id });
+          updates.push({ id: i.id, status: 'matched', matched_id: b.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
           break;
         }
       }
     }
 
-    // ── 3. Pass 2 — exact amount + date within 3 days (no reference needed) ──
+    // ── 4. Pass 2 — exact amount + date within 3 days ──────────────────────────
     for (const b of bank) {
-      if (usedB.has(String(b._id))) continue;
-      const bd = new Date(b.date);
+      if (usedB.has(b.id)) continue;
+      const bd = new Date(b.date).getTime();
       for (const i of internal) {
-        if (usedI.has(String(i._id))) continue;
-        const dayDiff = Math.abs(new Date(i.date) - bd) / 86400000;
+        if (usedI.has(i.id)) continue;
+        const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
         if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
-          updates.push({ id: b._id, status: 'matched', matched_id: i._id });
-          updates.push({ id: i._id, status: 'matched', matched_id: b._id });
-          usedB.add(String(b._id));
-          usedI.add(String(i._id));
+          updates.push({ id: b.id, status: 'matched', matched_id: i.id });
+          updates.push({ id: i.id, status: 'matched', matched_id: b.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
           break;
         }
       }
     }
 
-    // ── 4. Apply matched updates ──────────────────────────────────────────────
-    for (const u of updates) {
-      await Transaction.findByIdAndUpdate(u.id, {
-        $set: { status: u.status, matched_id: u.matched_id }
-      });
+    // ── 5. Apply matched updates in batches ────────────────────────────────────
+    // Note: Supabase doesn't have a bulk update for different rows easily via client, 
+    // but we can at least do it in small chunks or use a single query if we had an RPC.
+    // For now, we use Promise.all to parallelize, but limited to avoid rate limits.
+    const batchSize = 10;
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize);
+      await Promise.all(batch.map(u => 
+        supabase.from('transactions').update({ status: u.status, matched_id: u.matched_id }).eq('id', u.id)
+      ));
     }
 
-    // ── 5. Detect duplicates — same source, same amount, same ref, within 1 day
-    const pending = await Transaction.find({ user: this.userId, status: 'pending' });
+    // ── 6. Detect duplicates ───────────────────────────────────────────────────
+    const pending = allTx.filter(t => !usedB.has(t.id) && !usedI.has(t.id));
     const duplicateIds = new Set();
+    const dupMap = new Map();
 
-    for (let i = 0; i < pending.length; i++) {
-      for (let j = i + 1; j < pending.length; j++) {
-        const a = pending[i], b = pending[j];
-        if (duplicateIds.has(String(b._id))) continue;
-        const sameSrc = a.source === b.source;
-        const sameAmt = Math.abs(a.amount - b.amount) < 0.01;
-        const sameRef = a.reference && b.reference && a.reference === b.reference;
-        const closeDate = Math.abs(new Date(a.date) - new Date(b.date)) / 86400000 <= 1;
-        if (sameSrc && sameAmt && sameRef && closeDate) {
-          duplicateIds.add(String(b._id));
+    for (const t of pending) {
+      const key = `${t.source}_${Math.round(t.amount * 100)}_${t.reference || ''}`;
+      if (!dupMap.has(key)) {
+        dupMap.set(key, [t]);
+      } else {
+        const existing = dupMap.get(key);
+        for (const e of existing) {
+          if (Math.abs(new Date(t.date).getTime() - new Date(e.date).getTime()) / 86400000 <= 1) {
+            duplicateIds.add(t.id);
+            break;
+          }
         }
+        existing.push(t);
       }
     }
-
     if (duplicateIds.size > 0) {
-      await Transaction.updateMany(
-        { _id: { $in: [...duplicateIds] } },
-        { $set: { status: 'duplicate' } }
-      );
+      await supabase.from('transactions').update({ status: 'duplicate' }).in('id', [...duplicateIds]);
     }
 
-    // ── 6. Flag exceptions — large unmatched amounts (over 10,000) ───────────
-    const EXCEPTION_THRESHOLD = 10000;
-    const stillPending = await Transaction.find({ user: this.userId, status: 'pending' });
-    const exceptionIds = stillPending
-      .filter(t => Math.abs(t.amount) >= EXCEPTION_THRESHOLD)
-      .map(t => t._id);
-
+    // ── 7. Flag exceptions (>= 10,000) ──────────────────────────────────────────
+    const THRESHOLD = 10000;
+    const exceptionIds = pending.filter(t => !duplicateIds.has(t.id) && Math.abs(t.amount) >= THRESHOLD).map(t => t.id);
     if (exceptionIds.length > 0) {
-      await Transaction.updateMany(
-        { _id: { $in: exceptionIds } },
-        { $set: { status: 'exception' } }
-      );
+      await supabase.from('transactions').update({ status: 'exception' }).in('id', exceptionIds);
     }
 
-    // ── 7. Everything else → unmatched ───────────────────────────────────────
-    await Transaction.updateMany(
-      { user: this.userId, status: 'pending' },
-      { $set: { status: 'unmatched' } }
-    );
+    // ── 8. Everything else → unmatched ─────────────────────────────────────────
+    const unmatchedIds = pending.filter(t => !duplicateIds.has(t.id) && !exceptionIds.includes(t.id)).map(t => t.id);
+    if (unmatchedIds.length > 0) {
+      await supabase.from('transactions').update({ status: 'unmatched' }).in('id', unmatchedIds);
+    }
 
-    // ── 8. Build summary ──────────────────────────────────────────────────────
-    const all = await Transaction.find({ user: this.userId });
-    const bankTxs = all.filter(t => t.source === 'bank');
-    const intTxs = all.filter(t => t.source === 'internal');
-
-    const bankTotal = bankTxs.reduce((s, t) => s + t.amount, 0);
-    const internalTotal = intTxs.reduce((s, t) => s + t.amount, 0);
+    // ── 9. Final Summary ───────────────────────────────────────────────────────
+    const { data: final } = await supabase.from('transactions').select('*').eq('user_id', userId);
+    const bankTxs = final.filter(t => t.source === 'bank');
+    const intTxs = final.filter(t => t.source === 'internal');
+    const bankTotal = Math.round(bankTxs.reduce((s, t) => s + t.amount, 0) * 100) / 100;
+    const internalTotal = Math.round(intTxs.reduce((s, t) => s + t.amount, 0) * 100) / 100;
     const variance = Math.round((bankTotal - internalTotal) * 100) / 100;
-
-    const count = (status) => all.filter(t => t.status === status).length;
+    const countByStatus = (st) => final.filter(t => t.status === st).length;
 
     return {
-      matched: count('matched'),
-      unmatched: count('unmatched'),
-      duplicates: count('duplicate'),
-      exceptions: count('exception'),
-      total: all.length,
-      bank_total: Math.round(bankTotal * 100) / 100,
-      internal_total: Math.round(internalTotal * 100) / 100,
+      matched: countByStatus('matched'),
+      unmatched: countByStatus('unmatched'),
+      duplicates: countByStatus('duplicate'),
+      exceptions: countByStatus('exception'),
+      total: final.length,
+      bank_total: bankTotal,
+      internal_total: internalTotal,
       variance,
       status: variance === 0 ? 'BALANCED' : 'VARIANCE DETECTED',
       unmatched_bank: bankTxs.filter(t => t.status === 'unmatched').length,

@@ -24,7 +24,7 @@ export default function Tickets({ user, toast }) {
     if (error) toast(error.message, "error");
   }, [error, toast]);
 
-  const tickets = r?.data || r || [];
+  const tickets = r?.tickets || r?.data || r || [];
 
   const load = () => { queryClient.invalidateQueries({ queryKey: ['tickets'] }); };
 
@@ -127,7 +127,7 @@ export default function Tickets({ user, toast }) {
                         {user?.role === "admin" && (
                           <select className="inp py-1 px-2 text-[11px] w-auto bg-white"
                             value={t.status} onChange={e => changeStatus(t.id ?? t._id, e.target.value)}>
-                            {["open","in-progress","resolved","closed"].map(s => <option key={s} value={s}>{s}</option>)}
+                            {["open","in_progress","resolved","closed"].map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         )}
                         {user?.role === "admin" && (

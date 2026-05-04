@@ -1,35 +1,36 @@
 const BaseService = require('../BaseService');
-// Models removed
+const supabase = require('../../config/supabase');
 
 class ListTransactionsService extends BaseService {
   async run() {
-    const { source, status, category, dateFrom, dateTo, search, sortBy = 'date', sortOrder = 'desc', page = 1, limit = 50 } = this.args;
-    const skip = (page - 1) * limit;
+    const { source, status, search, page = 1, limit = 50 } = this.args;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    const filter = { user: this.userId };
-    if (source) filter.source = source;
-    if (status) filter.status = status;
-    if (category) filter.category = new RegExp(category, 'i');
-    if (dateFrom || dateTo) {
-      filter.date = {};
-      if (dateFrom) filter.date.$gte = dateFrom;
-      if (dateTo) filter.date.$lte = dateTo;
+    let query = supabase.from('transactions').select('*', { count: 'exact' });
+    
+    // Always scope by user_id
+    if (this.userId) {
+      query = query.eq('user_id', this.userId);
     }
-    if (search) {
-      filter.$or = [
-        { description: new RegExp(search, 'i') },
-        { reference: new RegExp(search, 'i') },
-        { category: new RegExp(search, 'i') },
-      ];
-    }
+    
+    if (source) query = query.eq('source', source);
+    if (status) query = query.eq('status', status);
+    if (search) query = query.ilike('description', `%${search}%`);
+    
+    const { data, count, error } = await query
+      .order('date', { ascending: false })
+      .range(from, to);
 
-    const sortDir = sortOrder === 'asc' ? 1 : -1;
-    const [txs, total] = await Promise.all([
-      Transaction.find(filter).sort({ [sortBy]: sortDir }).skip(skip).limit(limit).lean(),
-      Transaction.countDocuments(filter),
-    ]);
-
-    return { txs, page, limit, total };
+    if (error) throw error;
+    
+    return {
+      txs: data.map(t => ({ ...t, _id: t.id, createdAt: t.created_at })),
+      page, 
+      limit, 
+      total: count, 
+      pages: Math.ceil(count / limit)
+    };
   }
 }
 
