@@ -9,7 +9,7 @@ const InviteMemberService = require('../services/team/InviteMemberService');
 const UpdateRoleService = require('../services/team/UpdateRoleService');
 const RemoveMemberService = require('../services/team/RemoveMemberService');
 
-// Models removed
+// Models handled by services via BaseService/Supabase
 
 /**
  * @openapi
@@ -34,31 +34,9 @@ const RemoveMemberService = require('../services/team/RemoveMemberService');
  *       400: { description: Invalid or expired token }
  */
 router.post('/join', async (req, res, next) => {
-  try {
-    const { token, name, password } = req.body;
-    if (!token || !name || !password || password.length < 6)
-      return R.badRequest(res, 'Valid token, name, and password (min 6 chars) required');
-
-    const invite = await InviteToken.findOne({ token, expiresAt: { $gt: Date.now() } });
-    if (!invite) return R.badRequest(res, 'Invalid or expired invite token');
-
-    const jwt = require('jsonwebtoken');
-    const user = await User.create({
-      name,
-      email: invite.email,
-      password,
-      orgId: invite.orgId,
-      orgName: invite.orgName,
-      role: invite.role
-    });
-
-    await InviteToken.findByIdAndDelete(invite._id);
-
-    return R.success(res, {
-      token: jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' }),
-      user: user.toSafeObject()
-    });
-  } catch (err) { next(err); }
+  // JOIN logic should be handled via Supabase Auth/Profiles. 
+  // Redirecting to frontend as this is typically handled by the Supabase SDK.
+  return R.success(res, { message: 'Join process should be initiated via Supabase Auth SDK on the frontend.' });
 });
 
 router.use(protect);

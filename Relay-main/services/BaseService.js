@@ -154,6 +154,12 @@ async function handleSupabaseRequest(serviceName, args, context) {
     };
   }
 
+  if (serviceName.includes('GetTransaction')) {
+    const { data, error } = await supabase.from('transactions').select('*').eq('id', args.id).eq('user_id', userId).single();
+    if (error) throw error;
+    return mapId(data);
+  }
+
   if (serviceName.includes('CreateTransaction')) {
     const { data, error } = await supabase.from('transactions').insert([{
       ...args,
@@ -372,11 +378,41 @@ async function handleSupabaseRequest(serviceName, args, context) {
     return mapId(data);
   }
 
-  // ── Tickets ─────────────────────────────────────────────────────────────────
-  if (serviceName.includes('GetTickets')) {
-    const { data, error } = await supabase.from('tickets').select('*, ticket_comments(*)').eq('user_id', userId).order('created_at', { ascending: false });
+  if (serviceName.includes('UpdateRole')) {
+    const { data, error } = await supabase.from('profiles').update({ role: args.role }).eq('id', args.targetUserId).select().single();
     if (error) throw error;
     return mapId(data);
+  }
+
+  if (serviceName.includes('RemoveMember')) {
+    const { error } = await supabase.from('profiles').delete().eq('id', args.targetUserId);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  // ── Tickets ─────────────────────────────────────────────────────────────────
+  if (serviceName.includes('ListTickets')) {
+    const { data, count, error } = await supabase.from('tickets').select('*, ticket_comments(*)').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return { tickets: mapId(data), total: count, page: 1, limit: 50 };
+  }
+
+  if (serviceName.includes('GetTicket')) {
+    const { data, error } = await supabase.from('tickets').select('*, ticket_comments(*)').eq('id', args.id).eq('user_id', userId).single();
+    if (error) throw error;
+    return mapId(data);
+  }
+
+  if (serviceName.includes('UpdateTicket')) {
+    const { data, error } = await supabase.from('tickets').update(args).eq('id', args.id).eq('user_id', userId).select().single();
+    if (error) throw error;
+    return mapId(data);
+  }
+
+  if (serviceName.includes('DeleteTicket')) {
+    const { error } = await supabase.from('tickets').delete().eq('id', args.id).eq('user_id', userId);
+    if (error) throw error;
+    return { success: true };
   }
 
   if (serviceName.includes('CreateTicket')) {
