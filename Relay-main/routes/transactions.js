@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
-const { protect, memberOrAdmin } = require('../middleware/auth');
+const { protect, memberOrAdmin } = require('../middleware/supabaseAuth');
 const audit = require('../middleware/audit');
 const { importLimiter } = require('../middleware/security');
 const R       = require('../utils/response');

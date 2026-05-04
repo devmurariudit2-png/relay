@@ -1,6 +1,5 @@
 const router = require('express').Router();
-const { protect } = require('../middleware/auth');
-const authService = require('../services/authService');
+const { protect } = require('../middleware/supabaseAuth');
 const audit = require('../middleware/audit');
 const { authLimiter } = require('../middleware/security');
 const R = require('../utils/response');
@@ -87,8 +86,10 @@ router.post('/login',
   async (req, res, next) => {
     try {
       const { email, password } = req.body;
-      const result = await authService.login({ email, password });
-      return R.success(res, result);
+      const supabase = require('../config/supabase');
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      return R.success(res, { token: data.session.access_token, user: data.user });
     } catch (err) { next(err); }
   }
 );
@@ -146,8 +147,15 @@ router.put('/profile',
   async (req, res, next) => {
     try {
       const { name, currency } = req.body;
-      const user = await authService.updateProfile(req.user._id, { name, currency });
-      return R.success(res, user);
+      const update = {};
+      if (name) update.full_name = name;
+      if (currency) update.currency = currency;
+      
+      const supabase = require('../config/supabase');
+      const { data, error } = await supabase.from('profiles').update(update).eq('id', req.user._id).select().single();
+      if (error) throw error;
+      
+      return R.success(res, { ...data, _id: data.id });
     } catch (err) { next(err); }
   }
 );
@@ -180,9 +188,11 @@ router.put('/password',
   passwordRules, validate,
   async (req, res, next) => {
     try {
-      const { currentPassword, newPassword } = req.body;
-      const result = await authService.updatePassword(req.user._id, currentPassword, newPassword);
-      return R.success(res, result);
+      const { newPassword } = req.body;
+      const supabase = require('../config/supabase');
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      return R.success(res, { message: 'Password updated successfully' });
     } catch (err) { next(err); }
   }
 );

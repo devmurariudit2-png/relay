@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/supabaseAuth');
 const audit = require('../middleware/audit');
 const R = require('../utils/response');
 const adminService = require('../services/adminService');

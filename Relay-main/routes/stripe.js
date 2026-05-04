@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { protect } = require('../middleware/auth');
+const { protect } = require('../middleware/supabaseAuth');
 const R = require('../utils/response');
 
 const CreateCheckoutService = require('../services/stripe/CreateCheckoutService');
