@@ -1,5 +1,5 @@
 const BaseService = require('../BaseService');
-const Ticket = require('../../models/Ticket');
+// Models removed
 const { AppError, Errors } = require('../../errors/AppError');
 
 class UpdateTicketService extends BaseService {

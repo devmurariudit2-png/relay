@@ -1,5 +1,5 @@
 const BaseService = require('../BaseService');
-const Subscription = require('../../models/Subscription');
+// Models removed
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 const { AppError, Errors } = require('../../errors/AppError');
 

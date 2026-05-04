@@ -1,6 +1,6 @@
 const BaseService = require('../BaseService');
-const Transaction = require('../../models/Transaction');
-const Subscription = require('../../models/Subscription');
+// Models removed
+// Models removed
 const { AppError, Errors } = require('../../errors/AppError');
 
 const LIMITS = { free: 10000, starter: 50000, growth: 250000, scale: 1000000, enterprise: Infinity };

@@ -1,5 +1,5 @@
 const BaseService = require('../BaseService');
-const User = require('../../models/User');
+// Models removed
 const { AppError, Errors } = require('../../errors/AppError');
 
 class UpdateRoleService extends BaseService {

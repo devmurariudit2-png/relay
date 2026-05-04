@@ -1,6 +1,6 @@
 const BaseService = require('../BaseService');
-const User = require('../../models/User');
-const InviteToken = require('../../models/InviteToken');
+// Models removed
+// Models removed
 const { AppError, Errors } = require('../../errors/AppError');
 const { randomBytes } = require('crypto');
 

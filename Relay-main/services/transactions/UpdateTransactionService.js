@@ -1,5 +1,5 @@
 const BaseService = require('../BaseService');
-const Transaction = require('../../models/Transaction');
+// Models removed
 const { AppError, Errors } = require('../../errors/AppError');
 
 class UpdateTransactionService extends BaseService {

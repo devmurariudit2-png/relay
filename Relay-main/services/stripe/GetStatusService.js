@@ -23,8 +23,8 @@ class GetStatusService extends BaseService {
       };
     }
 
-    const Subscription = require('../../models/Subscription');
-    const Transaction = require('../../models/Transaction');
+// Models removed
+// Models removed
     const orgId = this.user.orgId;
     let sub = await Subscription.findOne({ orgId });
     if (!sub) {

@@ -1,5 +1,5 @@
 const BaseService = require('../BaseService');
-const Transaction = require('../../models/Transaction');
+// Models removed
 
 class GetLedgerService extends BaseService {
   async run() {

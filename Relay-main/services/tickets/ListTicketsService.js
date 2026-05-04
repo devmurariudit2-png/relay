@@ -1,5 +1,5 @@
 const BaseService = require('../BaseService');
-const Ticket = require('../../models/Ticket');
+// Models removed
 
 class ListTicketsService extends BaseService {
   async run() {
