@@ -1,4 +1,4 @@
-const AuditLog = require('../models/AuditLog');
+// Models removed
 const logger   = require('../utils/logger');
 
 const isSupabase = () => !!process.env.SUPABASE_URL;

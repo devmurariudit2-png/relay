@@ -1,4 +1,4 @@
-const Transaction = require('../models/Transaction');
+// Models removed
 const jobService = require('./jobService');
 
 const buildTransactionFilter = (userId, query) => {

@@ -9,7 +9,7 @@ const InviteMemberService = require('../services/team/InviteMemberService');
 const UpdateRoleService = require('../services/team/UpdateRoleService');
 const RemoveMemberService = require('../services/team/RemoveMemberService');
 
-const InviteToken = require('../models/InviteToken');
+// Models removed
 
 /**
  * @openapi

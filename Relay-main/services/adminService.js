@@ -1,7 +1,4 @@
-const User = require('../models/User');
-const Transaction = require('../models/Transaction');
-const Ticket = require('../models/Ticket');
-const AuditLog = require('../models/AuditLog');
+// Models removed
 const supabase = require('../config/supabase');
 
 const isSupabase = () => !!process.env.SUPABASE_URL;

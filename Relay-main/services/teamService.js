@@ -1,4 +1,4 @@
-const User = require('../models/User');
+// Models removed
 
 const listTeam = async (user) => {
   const filter = user.orgId ? { orgId: user.orgId } : {};

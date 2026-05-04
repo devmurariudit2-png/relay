@@ -1,4 +1,4 @@
-const Ticket = require('../models/Ticket');
+// Models removed
 
 const listTickets = async (user, query) => {
   const page = query.page || 1;
