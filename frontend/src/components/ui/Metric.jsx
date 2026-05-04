@@ -1,14 +1,14 @@
 import Card from "./Card.jsx";
 
-export default function Metric({ label, value, sub, color = "#EF4444", icon }) {
+export default function Metric({ label, value, sub, color = "text-blue-600", icon }) {
   return (
-    <Card style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: ".5px" }}>{label}</span>
-        {icon && <span style={{ fontSize: 18, opacity: .5 }}>{icon}</span>}
+    <Card className="flex flex-col gap-2">
+      <div className="flex justify-between items-center">
+        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+        {icon && <span className="text-lg opacity-40">{icon}</span>}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 800, color, letterSpacing: "-1px", fontVariantNumeric: "tabular-nums" }}>{value ?? "—"}</div>
-      {sub && <div style={{ fontSize: 12, color: "#9CA3AF" }}>{sub}</div>}
+      <div className={`text-2xl font-extrabold tracking-tight tabular-nums ${color}`}>{value ?? "—"}</div>
+      {sub && <div className="text-[12px] text-gray-400 font-medium">{sub}</div>}
     </Card>
   );
 }

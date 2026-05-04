@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as API from "../api/index.js";
 import PageShell from "../components/layout/PageShell.jsx";
-import Spinner from "../components/ui/Spinner.jsx";
 import Card from "../components/ui/Card.jsx";
 import Tag from "../components/ui/Tag.jsx";
 
@@ -97,50 +96,77 @@ export default function Ledger({ toast }) {
   return (
     <PageShell title="Ledger" sub="Running balance view"
       actions={
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {["bank", "internal"].map(s => (
-            <button key={s} onClick={() => setSource(s)}
-              className={source === s ? "btn-primary" : "btn-ghost"}
-              style={{ padding: "8px 16px", fontSize: 13 }}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-          <div style={{ width: 1, background: "#E5E7EB", margin: "0 4px" }} />
-          <button className="btn-ghost" style={{ fontSize: 12, padding: "6px 10px" }} onClick={exportCSV}>CSV</button>
-          <button className="btn-ghost" style={{ fontSize: 12, padding: "6px 10px" }} onClick={exportPDF}>PDF</button>
+        <div className="flex gap-3">
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            {["bank", "internal"].map(s => (
+              <button key={s} onClick={() => setSource(s)}
+                className={`px-4 py-1.5 text-[12px] font-bold uppercase tracking-wider rounded-md transition-all ${source === s ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                {s}
+              </button>
+            ))}
+          </div>
+          <button className="btn-ghost text-[12px]" onClick={exportCSV}>Export CSV</button>
+          <button className="btn-ghost text-[12px]" onClick={exportPDF}>Export PDF</button>
         </div>
       }>
-      <Card style={{ padding: 0, overflow: "hidden" }}>
-        {loading ? <div style={{ padding: 40, textAlign: "center" }}><Spinner /></div> : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
+      <Card className="p-0 overflow-hidden shadow-sm border-gray-200">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="w-32">Date</th>
+                <th>Description</th>
+                <th className="w-32">Category</th>
+                <th className="w-32">Ref</th>
+                <th className="text-right w-32">Debit</th>
+                <th className="text-right w-32">Credit</th>
+                <th className="text-right w-40">Balance</th>
+                <th className="w-32">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [1,2,3,4,5,6,7,8].map(i => (
+                  <tr key={i}>
+                    <td><div className="skeleton h-3 w-20 rounded" /></td>
+                    <td><div className="skeleton h-3 w-48 rounded" /></td>
+                    <td><div className="skeleton h-3 w-16 rounded" /></td>
+                    <td><div className="skeleton h-3 w-12 rounded" /></td>
+                    <td className="text-right"><div className="skeleton h-3 w-16 rounded ml-auto" /></td>
+                    <td className="text-right"><div className="skeleton h-3 w-16 rounded ml-auto" /></td>
+                    <td className="text-right"><div className="skeleton h-3 w-24 rounded ml-auto" /></td>
+                    <td><div className="skeleton h-5 w-16 rounded-full" /></td>
+                  </tr>
+                ))
+              ) : rows.length === 0 ? (
                 <tr>
-                  <th>Date</th><th>Description</th><th>Category</th><th>Ref</th>
-                  <th className="mono" style={{ textAlign: "right" }}>Debit</th>
-                  <th className="mono" style={{ textAlign: "right" }}>Credit</th>
-                  <th className="mono" style={{ textAlign: "right" }}>Balance</th>
-                  <th>Status</th>
+                  <td colSpan={8} className="py-20 text-center">
+                    <div className="flex flex-col items-center max-w-xs mx-auto">
+                      <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      </div>
+                      <p className="text-sm font-bold text-gray-900 mb-1">No ledger entries</p>
+                      <p className="text-xs text-gray-500">Records will appear here once transactions are processed.</p>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? <tr><td colSpan={8} style={{ textAlign: "center", padding: 40, color: "#9CA3AF" }}>No entries found</td></tr> :
-                  rows.map(r => (
-                    <tr key={r.id}>
-                      <td className="mono" style={{ color: "#6B7280", fontSize: 12 }}>{r.date}</td>
-                      <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.description}</td>
-                      <td style={{ color: "#6B7280" }}>{r.category || "—"}</td>
-                      <td className="mono" style={{ color: "#9CA3AF", fontSize: 11 }}>{r.reference || "—"}</td>
-                      <td className="mono" style={{ textAlign: "right", color: "#DC2626" }}>{r.debit ? r.debit.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</td>
-                      <td className="mono" style={{ textAlign: "right", color: "#16A34A" }}>{r.credit ? r.credit.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</td>
-                      <td className="mono" style={{ textAlign: "right", fontWeight: 700, color: r.balance >= 0 ? "#1F2937" : "#DC2626" }}>{r.balance?.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                      <td><Tag label={r.status} /></td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ) : (
+                rows.map(r => (
+                  <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="mono text-gray-500 text-[12px]">{r.date}</td>
+                    <td className="font-semibold text-gray-900 truncate max-w-[200px]">{r.description}</td>
+                    <td className="text-gray-500 text-[13px]">{r.category || "—"}</td>
+                    <td className="mono text-gray-400 text-[11px]">{r.reference || "—"}</td>
+                    <td className="mono text-right text-red-600 tabular-nums">{r.debit ? r.debit.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}</td>
+                    <td className="mono text-right text-green-600 tabular-nums">{r.credit ? r.credit.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}</td>
+                    <td className={`mono text-right font-bold tabular-nums ${r.balance >= 0 ? "text-gray-900" : "text-red-600"}`}>{r.balance?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+                    <td><Tag label={r.status} /></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </PageShell>
   );

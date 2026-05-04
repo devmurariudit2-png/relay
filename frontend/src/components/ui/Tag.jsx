@@ -1,16 +1,20 @@
-export default function Tag({ label, color }) {
+export default function Tag({ label }) {
   const map = {
-    matched:   ["#F0FDF4","#16A34A"], pending:   ["#F3F4F6","#6B7280"],
-    unmatched: ["#FEF2F2","#DC2626"], exception: ["#FFFBEB","#D97706"],
-    duplicate: ["#F5F3FF","#7C3AED"], open:      ["#EFF6FF","#2563EB"],
-    closed:    ["#F0FDF4","#16A34A"], resolved:  ["#F0FDF4","#16A34A"],
-    "in-progress":["#FFFBEB","#D97706"],
-    admin:     ["#F5F3FF","#7C3AED"], member: ["#F3F4F6","#6B7280"], viewer: ["#F3F4F6","#9CA3AF"],
-    bank:      ["#EFF6FF","#2563EB"], internal: ["#F5F3FF","#7C3AED"],
-    low:       ["#F0FDF4","#16A34A"], medium: ["#FFFBEB","#D97706"], high: ["#FEF2F2","#DC2626"],
-    healthy:   ["#F0FDF4","#16A34A"],
-    connected: ["#F0FDF4","#16A34A"],
+    matched:   "bg-green-50 text-green-700 border-green-100",
+    pending:   "bg-gray-50 text-gray-600 border-gray-100",
+    unmatched: "bg-red-50 text-red-700 border-red-100",
+    exception: "bg-amber-50 text-amber-700 border-amber-100",
+    duplicate: "bg-purple-50 text-purple-700 border-purple-100",
+    open:      "bg-blue-50 text-blue-700 border-blue-100",
+    closed:    "bg-green-50 text-green-700 border-green-100",
+    resolved:  "bg-green-50 text-green-700 border-green-100",
+    "in-progress": "bg-amber-50 text-amber-700 border-amber-100",
+    admin:     "bg-indigo-50 text-indigo-700 border-indigo-100",
+    member:    "bg-gray-50 text-gray-600 border-gray-100",
+    bank:      "bg-blue-50 text-blue-700 border-blue-100",
+    internal:  "bg-purple-50 text-purple-700 border-purple-100",
   };
-  const [bg, cl] = map[label?.toLowerCase()] || ["#F3F4F6","#6B7280"];
-  return <span className="tag" style={{ background: bg, color: cl }}>{label}</span>;
+  
+  const theme = map[label?.toLowerCase()] || "bg-gray-50 text-gray-600 border-gray-100";
+  return <span className={`tag border ${theme}`}>{label}</span>;
 }

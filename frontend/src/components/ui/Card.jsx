@@ -1,5 +1,5 @@
-export default function Card({ children, style = {}, className = "" }) {
+export default function Card({ children, className = "" }) {
   return (
-    <div className={`card ${className}`} style={{ padding: 24, ...style }}>{children}</div>
+    <div className={`card p-6 rounded-2xl ${className}`}>{children}</div>
   );
 }
