@@ -290,6 +290,20 @@ async function handleSupabaseRequest(serviceName, args, context) {
     if (error) throw error;
     return mapId(data);
   }
+
+  if (serviceName.includes('UpdateRole')) {
+    const { targetUserId, role } = args;
+    const { data, error } = await supabase.from('profiles').update({ role }).eq('id', targetUserId).select().single();
+    if (error) throw error;
+    return mapId(data);
+  }
+
+  if (serviceName.includes('RemoveMember')) {
+    const { targetUserId } = args;
+    const { error } = await supabase.auth.admin.deleteUser(targetUserId);
+    if (error) throw error;
+    return { deleted: targetUserId };
+  }
   
   if (serviceName.includes('InviteMember')) {
     const { data, error } = await supabase.from('profiles').insert([{

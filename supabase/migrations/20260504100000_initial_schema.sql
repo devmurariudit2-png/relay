@@ -157,17 +157,19 @@ CREATE TRIGGER on_auth_user_created
 -- ── RLS POLICIES ─────────────────────────────────────────────────────────────
 
 -- 1. Profiles Policies
-DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
-CREATE POLICY "Users can view their own profile" ON public.profiles
-  FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can view teammates" ON public.profiles;
+CREATE POLICY "Users can view teammates" ON public.profiles
+  FOR SELECT USING (
+    auth.uid() = id 
+    OR 
+    (org_name IS NOT NULL AND org_name = (SELECT org_name FROM public.profiles WHERE id = auth.uid()))
+    OR
+    public.is_admin()
+  );
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
-
-DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
-CREATE POLICY "Admins can view all profiles" ON public.profiles
-  FOR SELECT USING (public.is_admin());
 
 -- 2. Transactions Policies
 DROP POLICY IF EXISTS "Users can view their own transactions" ON public.transactions;
