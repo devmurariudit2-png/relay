@@ -1,5 +1,5 @@
 const BaseService = require('../BaseService');
-// Models removed
+const supabase = require('../../config/supabase');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 const { AppError, Errors } = require('../../errors/AppError');
 
@@ -28,22 +28,22 @@ class CreateCheckoutService extends BaseService {
 
     const priceId = await this.getValidPriceId(tier);
 
-    const orgId = this.user.orgId;
-    let sub = await Subscription.findOne({ orgId });
-    if (!sub) {
-      sub = await Subscription.create({ orgId });
+    const userId = this.user.id || this.user._id;
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+
+    if (!profile) {
+      throw new AppError(Errors.NOT_FOUND, { message: 'Profile not found' });
     }
 
     // Create or retrieve customer
-    let customerId = sub.stripeCustomerId;
+    let customerId = profile.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: this.user.email,
-        metadata: { orgId }
+        metadata: { userId }
       });
       customerId = customer.id;
-      sub.stripeCustomerId = customerId;
-      await sub.save();
+      await supabase.from('profiles').update({ stripe_customer_id: customerId }).eq('id', userId);
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -53,7 +53,7 @@ class CreateCheckoutService extends BaseService {
       mode: 'subscription',
       success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/subscription?success=true`,
       cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/subscription?canceled=true`,
-      metadata: { orgId, tier }
+      metadata: { userId, tier }
     });
 
     return { url: session.url };
@@ -65,7 +65,7 @@ class CreateCheckoutService extends BaseService {
       // 1. Check if we already created it in Stripe
       const existingProducts = await stripe.products.list({ active: true, limit: 100 });
       let product = existingProducts.data.find(p => p.name === tierPricing[tier].name);
-      
+
       if (product) {
         const prices = await stripe.prices.list({ product: product.id, active: true });
         if (prices.data.length > 0) {

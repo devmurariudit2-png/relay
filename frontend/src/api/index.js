@@ -44,13 +44,13 @@ async function req(method, path, body, isFormData = false, options = {}) {
 
 async function reqFull(method, path, params = {}) {
   const q = new URLSearchParams(
-    Object.fromEntries(Object.entries(params).filter(([,v]) => v !== undefined && v !== ''))
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''))
   ).toString();
   const headers = { 'Content-Type': 'application/json' };
   const token = await getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res  = await fetch(`${BASE}${path}${q ? '?' + q : ''}`, { headers });
-  const raw  = await res.json().catch(() => ({}));
+  const res = await fetch(`${BASE}${path}${q ? '?' + q : ''}`, { headers });
+  const raw = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401) {
       await supabase.auth.signOut();
@@ -79,49 +79,49 @@ export const register = async (name, email, password) => {
 
 export const logout = () => supabase.auth.signOut();
 export const getMe = () => req('GET', '/auth/me');
-export const updateProfile  = (data) => req('PUT', '/auth/profile', data);
+export const updateProfile = (data) => req('PUT', '/auth/profile', data);
 export const changePassword = (cur, np) => req('PUT', '/auth/password', { currentPassword: cur, newPassword: np });
 
 // Health
 export const getHealth = () => req('GET', '/health');
 
 // Transactions
-export const getTransactions      = (params = {}) => reqFull('GET', '/transactions', params);
-export const createTransaction    = (data) => req('POST', '/transactions', data);
-export const getTransaction       = (id) => req('GET', `/transactions/${id}`);
-export const updateTransaction    = (id, data) => req('PATCH', `/transactions/${id}`, data);
-export const deleteTransaction    = (id) => req('DELETE', `/transactions/${id}`);
+export const getTransactions = (params = {}) => reqFull('GET', '/transactions', params);
+export const createTransaction = (data) => req('POST', '/transactions', data);
+export const getTransaction = (id) => req('GET', `/transactions/${id}`);
+export const updateTransaction = (id, data) => req('PATCH', `/transactions/${id}`, data);
+export const deleteTransaction = (id) => req('DELETE', `/transactions/${id}`);
 export const importCSV = (file, source) => {
   const fd = new FormData();
   fd.append('file', file);
   fd.append('source', source);
   return req('POST', '/transactions/import', fd, true);
 };
-export const reconcile  = () => req('POST', '/transactions/reconcile');
-export const getLedger  = (source) => req('GET', `/transactions/ledger?source=${source}`);
+export const reconcile = () => req('POST', '/transactions/reconcile');
+export const getLedger = (source) => req('GET', `/transactions/ledger?source=${source}`);
 export const getSummary = () => req('GET', '/transactions/summary');
 
 // Tickets
-export const getTickets    = (params = {}) => reqFull('GET', '/tickets', params);
-export const createTicket  = (data) => req('POST', '/tickets', data);
-export const getTicket     = (id) => req('GET', `/tickets/${id}`);
-export const updateTicket  = (id, data) => req('PATCH', `/tickets/${id}`, data);
-export const deleteTicket  = (id) => req('DELETE', `/tickets/${id}`);
+export const getTickets = (params = {}) => reqFull('GET', '/tickets', params);
+export const createTicket = (data) => req('POST', '/tickets', data);
+export const getTicket = (id) => req('GET', `/tickets/${id}`);
+export const updateTicket = (id, data) => req('PATCH', `/tickets/${id}`, data);
+export const deleteTicket = (id) => req('DELETE', `/tickets/${id}`);
 
 // Team
-export const getTeamMembers       = (options = {}) => req('GET', '/team', null, false, options);
-export const inviteTeamMember     = (email, role) => req('POST', '/team/invite', { email, role });
+export const getTeamMembers = (options = {}) => req('GET', '/team', null, false, options);
+export const inviteTeamMember = (email, role) => req('POST', '/team/invite', { email, role });
 export const updateTeamMemberRole = (id, role) => req('PATCH', `/team/${id}`, { role });
-export const removeTeamMember     = (id) => req('DELETE', `/team/${id}`);
+export const removeTeamMember = (id) => req('DELETE', `/team/${id}`);
 
 // Admin
-export const getAdminUsers     = (params = {}) => reqFull('GET', '/admin/users', params);
-export const getAdminUser      = (id) => req('GET', `/admin/users/${id}`);
-export const updateAdminUser   = (id, data) => req('PATCH', `/admin/users/${id}`, data);
-export const deleteAdminUser   = (id) => req('DELETE', `/admin/users/${id}`);
+export const getAdminUsers = (params = {}) => reqFull('GET', '/admin/users', params);
+export const getAdminUser = (id) => req('GET', `/admin/users/${id}`);
+export const updateAdminUser = (id, data) => req('PATCH', `/admin/users/${id}`, data);
+export const deleteAdminUser = (id) => req('DELETE', `/admin/users/${id}`);
 export const getAdminAnalytics = () => req('GET', '/admin/analytics');
-export const getMonitoring     = () => req('GET', '/admin/monitoring');
-export const getAuditLog       = (params = {}) => reqFull('GET', '/admin/audit', params);
+export const getMonitoring = () => req('GET', '/admin/monitoring');
+export const getAuditLog = (params = {}) => reqFull('GET', '/admin/audit', params);
 
 // Export req function for custom API calls (e.g., job status)
 export { req };
@@ -129,7 +129,7 @@ export { req };
 // Stripe
 export const getSubscriptionStatus = () => req('GET', '/stripe/status');
 export const createCheckoutSession = (tier) => req('POST', '/stripe/create-checkout', { tier });
-export const createPortalSession   = () => req('POST', '/stripe/portal');
+export const createPortalSession = () => req('POST', '/stripe/portal');
 
 // Direct fetch wrapper with Auth token for getting raw data (like swagger JSON)
 export const fetchAuth = async (path) => {

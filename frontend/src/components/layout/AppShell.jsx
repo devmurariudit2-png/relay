@@ -6,20 +6,50 @@ import Toast from "../ui/Toast.jsx";
 import Spinner from "../ui/Spinner.jsx";
 
 // Lazy-loaded pages — each becomes its own chunk, loaded on first visit
-const Dashboard    = lazy(() => import("../../pages/Dashboard.jsx"));
+const Dashboard = lazy(() => import("../../pages/Dashboard.jsx"));
 const Transactions = lazy(() => import("../../pages/Transactions.jsx"));
-const Team         = lazy(() => import("../../pages/Team.jsx"));
-const Reconcile    = lazy(() => import("../../pages/Reconcile.jsx"));
-const Ledger       = lazy(() => import("../../pages/Ledger.jsx"));
-const Tickets      = lazy(() => import("../../pages/Tickets.jsx"));
-const Admin        = lazy(() => import("../../pages/Admin.jsx"));
-const Settings     = lazy(() => import("../../pages/Settings.jsx"));
-const ApiDocs      = lazy(() => import("../../pages/ApiDocs.jsx"));
+const Team = lazy(() => import("../../pages/Team.jsx"));
+const Reconcile = lazy(() => import("../../pages/Reconcile.jsx"));
+const Ledger = lazy(() => import("../../pages/Ledger.jsx"));
+const Tickets = lazy(() => import("../../pages/Tickets.jsx"));
+const Admin = lazy(() => import("../../pages/Admin.jsx"));
+const Settings = lazy(() => import("../../pages/Settings.jsx"));
+const ApiDocs = lazy(() => import("../../pages/ApiDocs.jsx"));
 const Subscription = lazy(() => import("../../pages/Subscription.jsx"));
 
 const PageLoader = () => (
-  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-    <Spinner size={28} />
+  <div className="flex-1 p-6 md:p-8 w-full max-w-7xl mx-auto w-full">
+    {/* Header Skeleton */}
+    <div className="flex justify-between items-center mb-8">
+      <div>
+        <div className="h-8 w-48 bg-gray-200 rounded-md animate-pulse mb-3"></div>
+        <div className="h-4 w-64 bg-gray-100 rounded-md animate-pulse"></div>
+      </div>
+      <div className="h-10 w-32 bg-gray-200 rounded-lg animate-pulse hidden sm:block"></div>
+    </div>
+
+    {/* Stats/Cards Skeleton */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="h-32 bg-gray-50 rounded-xl border border-gray-100 animate-pulse"></div>
+      ))}
+    </div>
+
+    {/* Table Skeleton */}
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+      <div className="h-14 bg-gray-50 border-b border-gray-100 animate-pulse"></div>
+      <div className="divide-y divide-gray-50">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="p-4 flex items-center justify-between">
+            <div className="flex gap-4 w-1/2">
+              <div className="h-4 w-24 bg-gray-100 rounded animate-pulse"></div>
+              <div className="h-4 w-40 bg-gray-100 rounded animate-pulse hidden sm:block"></div>
+            </div>
+            <div className="h-4 w-20 bg-gray-100 rounded animate-pulse"></div>
+          </div>
+        ))}
+      </div>
+    </div>
   </div>
 );
 
@@ -31,7 +61,7 @@ export default function AppShell({ user, setUser, onLogout }) {
   const tab = location.pathname.split("/").pop();
 
   const toast = useCallback((msg, type = "success") => setToasts(p => [...p, { id: Date.now(), msg, type }]), []);
-  
+
   const handleLogout = () => {
     if (loggingOut) return;
     setLoggingOut(true);
@@ -44,7 +74,7 @@ export default function AppShell({ user, setUser, onLogout }) {
     <div className="flex h-screen overflow-hidden bg-white">
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
@@ -64,7 +94,7 @@ export default function AppShell({ user, setUser, onLogout }) {
             </div>
             <span className="font-bold text-gray-900">Relay</span>
           </div>
-          <button 
+          <button
             onClick={() => setIsSidebarOpen(true)}
             className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg"
           >

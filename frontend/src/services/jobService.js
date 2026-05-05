@@ -38,10 +38,12 @@ class JobService {
       const saved = sessionStorage.getItem('relay_active_jobs');
       if (saved) {
         const parsedJobs = JSON.parse(saved);
-        parsedJobs.forEach(([id, job]) => {
-          job.callbacks = { onProgress: null, onComplete: null, onError: null };
-          this.jobs.set(id, job);
-        });
+        if (Array.isArray(parsedJobs)) {
+          parsedJobs.forEach(([id, job]) => {
+            job.callbacks = { onProgress: null, onComplete: null, onError: null };
+            this.jobs.set(id, job);
+          });
+        }
       }
     } catch (e) {
       console.warn('[JobService] Failed to load state from sessionStorage', e);

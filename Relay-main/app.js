@@ -38,6 +38,8 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) return cb(null, true);
     if (/https:\/\/reconciler-.*\.vercel\.app$/.test(origin)) return cb(null, true);
     if (/https:\/\/relay-front-.*\.vercel\.app$/.test(origin)) return cb(null, true);
+    if (/https:\/\/frontend-.*\.vercel\.app$/.test(origin)) return cb(null, true);
+    if (origin === 'https://frontend-iota-ten-31.vercel.app') return cb(null, true);
     if (process.env.ALLOW_ALL_ORIGINS === 'true') return cb(null, true);
     cb(new Error(`CORS blocked: ${origin}`));
   },
