@@ -5,8 +5,11 @@ class CreateTicketService extends BaseService {
   async run() {
     const { title, description, priority, category } = this.args;
 
+    const userId = this.userId || (this.user && (this.user.id || this.user._id));
+    if (!userId) throw new Error('User ID is required to create a ticket');
+
     const insertData = {
-      user_id: this.userId,
+      user_id: userId,
       title,
       description,
       priority: priority || 'medium',
@@ -20,7 +23,10 @@ class CreateTicketService extends BaseService {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      const msg = error.message || JSON.stringify(error);
+      throw new Error(`Ticket creation failed: ${msg}`);
+    }
 
     return {
       ...data,

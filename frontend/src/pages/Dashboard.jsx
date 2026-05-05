@@ -48,7 +48,7 @@ export default function Dashboard({ user }) {
   const rate = analytics?.overview?.reconciliationRate ?? (summary ? Math.round(((summary.by_status?.matched || 0) / (summary.total || 1)) * 100) : 0);
 
   return (
-    <PageShell title="Dashboard" sub={`Welcome back, ${user?.name?.split(" ")[0]}`}>
+    <PageShell title="Dashboard" sub={`Welcome back, ${user?.full_name?.split(" ")[0] || user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "there"}`}>
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Metric icon="$" label="Bank Balance"    value={fmt(summary?.bank_balance)}     color="text-blue-600" sub="Total bank transactions" />

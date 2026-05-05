@@ -148,23 +148,30 @@ router.put('/profile',
   async (req, res, next) => {
     try {
       const { name, currency } = req.body;
-      const update = {};
-      if (name) update.full_name = name;
-      if (currency) update.currency = currency;
-      
-      const supabase = require('../config/supabase');
-      
-      // 1. Update Profiles table
-      const { data, error } = await supabase.from('profiles').update(update).eq('id', req.user.id).select().single();
-      if (error) throw error;
+      const userId = req.user.id || req.user._id;
+      if (!userId) return R.badRequest(res, 'User ID not found in token');
 
-      // 2. Sync with Supabase Auth Metadata for immediate session updates
-      const authUpdate = {};
-      if (name) authUpdate.full_name = name;
-      if (currency) authUpdate.currency = currency;
-      
-      await supabase.auth.updateUser({ data: authUpdate });
-      
+      const upsertPayload = { id: userId };
+      if (name) upsertPayload.full_name = name;
+      if (currency) upsertPayload.currency = currency;
+
+      const supabase = require('../config/supabase');
+
+      // Upsert ensures we never hit "0 rows updated" on a missing profile row
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert(upsertPayload, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+
+      // Sync to Supabase Auth user_metadata (non-fatal)
+      const authMeta = {};
+      if (name) authMeta.full_name = name;
+      if (currency) authMeta.currency = currency;
+      await supabase.auth.updateUser({ data: authMeta }).catch(() => {});
+
       return R.success(res, { ...data, _id: data.id });
     } catch (err) { next(err); }
   }
