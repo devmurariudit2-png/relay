@@ -7,14 +7,18 @@ import Tag from "../components/ui/Tag.jsx";
 import PasswordInput from "../components/ui/PasswordInput.jsx";
 
 export default function Settings({ user, setUser, toast }) {
-  const [name, setName] = useState(user?.name || "");
+  const [name, setName] = useState(user?.full_name || "");
   const [currency, setCurrency] = useState(user?.currency || "USD");
   const [cur, setCur] = useState(""); const [np, setNp] = useState("");
   const [saving, setSaving] = useState(false); const [savingPw, setSavingPw] = useState(false);
 
   const saveProfile = async () => {
     setSaving(true);
-    try { const u = await API.updateProfile({ name, currency }); setUser(p => ({ ...p, ...u })); toast("Profile updated"); }
+    try { 
+      const u = await API.updateProfile({ name, currency }); 
+      setUser(p => ({ ...p, ...u, full_name: u.full_name || name })); 
+      toast("Profile updated"); 
+    }
     catch (e) { toast(e.message, "error"); }
     finally { setSaving(false); }
   };

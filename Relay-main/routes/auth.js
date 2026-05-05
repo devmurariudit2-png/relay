@@ -112,6 +112,7 @@ router.get('/me', protect, (req, res) => {
     id: req.user.id,
     email: req.user.email,
     full_name: req.user.full_name || req.user.user_metadata?.full_name,
+    currency: req.user.currency || req.user.user_metadata?.currency || 'USD',
     role: req.user.role,
     org_name: req.user.org_name,
     active: req.user.active
@@ -152,8 +153,17 @@ router.put('/profile',
       if (currency) update.currency = currency;
       
       const supabase = require('../config/supabase');
-      const { data, error } = await supabase.from('profiles').update(update).eq('id', req.user._id).select().single();
+      
+      // 1. Update Profiles table
+      const { data, error } = await supabase.from('profiles').update(update).eq('id', req.user.id).select().single();
       if (error) throw error;
+
+      // 2. Sync with Supabase Auth Metadata for immediate session updates
+      const authUpdate = {};
+      if (name) authUpdate.full_name = name;
+      if (currency) authUpdate.currency = currency;
+      
+      await supabase.auth.updateUser({ data: authUpdate });
       
       return R.success(res, { ...data, _id: data.id });
     } catch (err) { next(err); }
