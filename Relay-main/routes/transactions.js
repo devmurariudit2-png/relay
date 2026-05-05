@@ -9,6 +9,7 @@ const {
   transactionRules, transactionPatchRules, mongoIdParam, paginationQuery, validate
 } = require('../middleware/validate');
 const { query } = require('express-validator');
+const idempotency = require('../middleware/idempotency');
 
 const ListTransactionsService = require('../services/transactions/ListTransactionsService');
 const CreateTransactionService = require('../services/transactions/CreateTransactionService');
@@ -125,6 +126,7 @@ router.post(
   memberOrAdmin,
   transactionRules,
   validate,
+  idempotency(),
   audit("CREATE", "Transaction"),
   async (req, res, next) => {
     try {
@@ -242,6 +244,7 @@ router.post('/import',
 router.post('/reconcile',
   protect,
   memberOrAdmin,
+  idempotency(),
   audit("RECONCILE", "Transaction"),
   async (req, res, next) => {
     try {

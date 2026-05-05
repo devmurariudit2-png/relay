@@ -9,17 +9,23 @@ const getToken = async () => {
 
 async function req(method, path, body, isFormData = false, options = {}) {
   if (!BASE) throw new Error('Backend API URL is not configured. Set VITE_API_URL.');
-  const headers = {};
+  const headers = { ...options.headers };
   if (!isFormData) headers['Content-Type'] = 'application/json';
+  if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
+  
   const token = await getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   let res;
   try {
+    const fetchOptions = { ...options };
+    delete fetchOptions.idempotencyKey;
+    delete fetchOptions.headers;
+
     res = await fetch(`${BASE}${path}`, {
       method, headers,
       body: isFormData ? body : body ? JSON.stringify(body) : undefined,
-      ...options
+      ...fetchOptions
     });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
@@ -87,7 +93,7 @@ export const getHealth = () => req('GET', '/health');
 
 // Transactions
 export const getTransactions = (params = {}) => reqFull('GET', '/transactions', params);
-export const createTransaction = (data) => req('POST', '/transactions', data);
+export const createTransaction = (data, options = {}) => req('POST', '/transactions', data, false, options);
 export const getTransaction = (id) => req('GET', `/transactions/${id}`);
 export const updateTransaction = (id, data) => req('PATCH', `/transactions/${id}`, data);
 export const deleteTransaction = (id) => req('DELETE', `/transactions/${id}`);
@@ -97,7 +103,7 @@ export const importCSV = (file, source) => {
   fd.append('source', source);
   return req('POST', '/transactions/import', fd, true);
 };
-export const reconcile = () => req('POST', '/transactions/reconcile');
+export const reconcile = (options = {}) => req('POST', '/transactions/reconcile', null, false, options);
 export const getLedger = (source) => req('GET', `/transactions/ledger?source=${source}`);
 export const getSummary = () => req('GET', '/transactions/summary');
 
