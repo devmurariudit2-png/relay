@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 
-const BASE = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : '/api');
+const BASE = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://relay-backend-sigma.vercel.app');
 
 const getToken = async () => {
   const { data: { session } } = await supabase.auth.getSession();

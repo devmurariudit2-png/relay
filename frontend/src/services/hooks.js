@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   transactionService,
   userService,
@@ -15,23 +16,17 @@ import {
 /**
  * Hook for managing transactions with loading and error states
  */
-export function useTransactions() {
-  const [transactions, setTransactions] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const fetchTransactions = useCallback(async (params = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await transactionService.getTransactions(params);
-      setTransactions(data);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+export function useTransactions(params = {}) {
+  const {
+    data: transactions,
+    isLoading: loading,
+    error,
+    refetch: fetchTransactions
+  } = useQuery({
+    queryKey: ['transactions', params],
+    queryFn: () => transactionService.getTransactions(params),
+    staleTime: 30 * 1000, // 30 seconds stale-time as per architecture spec
+  });
 
   return { transactions, loading, error, fetchTransactions };
 }
@@ -40,49 +35,42 @@ export function useTransactions() {
  * Hook for managing user authentication
  */
 export function useAuth() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
 
-  const fetchUser = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const userData = await userService.getCurrentUser();
-      setUser(userData);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
+  const {
+    data: user,
+    isLoading: loadingUser,
+    error: fetchError,
+    refetch: fetchUser
+  } = useQuery({
+    queryKey: ['authUser'],
+    queryFn: () => userService.getCurrentUser(),
+    staleTime: 5 * 60 * 1000, // 5 minutes stale-time for auth state
+    retry: false
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: ({ email, password }) => userService.login(email, password),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['authUser'], data.user || data);
     }
-  }, []);
+  });
 
-  const login = useCallback(async (email, password) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await userService.login(email, password);
-      setUser(response.user || response);
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
+  const logoutMutation = useMutation({
+    mutationFn: () => userService.logout(),
+    onSuccess: () => {
+      queryClient.setQueryData(['authUser'], null);
+      queryClient.clear();
     }
-  }, []);
-
-  const logout = useCallback(async () => {
-    setUser(null);
-    await userService.logout();
-  }, []);
+  });
 
   return {
     user,
-    loading,
-    error,
+    loading: loadingUser || loginMutation.isPending || logoutMutation.isPending,
+    error: fetchError || loginMutation.error || logoutMutation.error,
     fetchUser,
-    login,
-    logout,
+    login: (email, password) => loginMutation.mutateAsync({ email, password }),
+    logout: () => logoutMutation.mutateAsync(),
     isAuthenticated: !!user
   };
 }
@@ -90,85 +78,66 @@ export function useAuth() {
 /**
  * Hook for managing tickets
  */
-export function useTickets() {
-  const [tickets, setTickets] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export function useTickets(params = {}) {
+  const queryClient = useQueryClient();
 
-  const fetchTickets = useCallback(async (params = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await ticketService.getTickets(params);
-      setTickets(data);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
+  const {
+    data: tickets,
+    isLoading: loadingTickets,
+    error: fetchError,
+    refetch: fetchTickets
+  } = useQuery({
+    queryKey: ['tickets', params],
+    queryFn: () => ticketService.getTickets(params),
+    staleTime: 30 * 1000,
+  });
+
+  const createTicketMutation = useMutation({
+    mutationFn: (data) => ticketService.createTicket(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
     }
-  }, []);
+  });
 
-  const createTicket = useCallback(async (data) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const newTicket = await ticketService.createTicket(data);
-      setTickets(prev => prev ? [newTicket, ...prev] : [newTicket]);
-      return newTicket;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { tickets, loading, error, fetchTickets, createTicket };
+  return {
+    tickets,
+    loading: loadingTickets || createTicketMutation.isPending,
+    error: fetchError || createTicketMutation.error,
+    fetchTickets,
+    createTicket: (data) => createTicketMutation.mutateAsync(data)
+  };
 }
 
 /**
  * Hook for managing team members
  */
 export function useTeam() {
-  const [team, setTeam] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
 
-  const fetchTeamMembers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const members = await teamService.getTeamMembers();
-      setTeam(members);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    data: team,
+    isLoading: loadingTeam,
+    error: fetchError,
+    refetch: fetchTeamMembers
+  } = useQuery({
+    queryKey: ['team'],
+    queryFn: () => teamService.getTeamMembers(),
+    staleTime: 60 * 1000,
+  });
 
-  const inviteMember = useCallback(async (email, role) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await teamService.inviteTeamMember(email, role);
-      // Optionally refresh team list after invitation
-      await fetchTeamMembers();
-      return result;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
+  const inviteMemberMutation = useMutation({
+    mutationFn: ({ email, role }) => teamService.inviteTeamMember(email, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team'] });
     }
-  }, [fetchTeamMembers]);
+  });
 
   return {
     team,
-    loading,
-    error,
+    loading: loadingTeam || inviteMemberMutation.isPending,
+    error: fetchError || inviteMemberMutation.error,
     fetchTeamMembers,
-    inviteMember
+    inviteMember: (email, role) => inviteMemberMutation.mutateAsync({ email, role })
   };
 }
 
@@ -229,11 +198,11 @@ export function useReconciliation() {
     setProgress(0);
     try {
       const response = await jobService.startReconciliationJob();
-      
+
       if (response.jobId) {
         // Async job started
         setJobId(response.jobId);
-        
+
         // Monitor the job
         jobService.getJobStatus(
           response.jobId,

@@ -26,8 +26,8 @@ class TicketService {
       if (!data.title || !data.description) {
         throw new Error('Title and description are required');
       }
-      if (!['low', 'medium', 'high'].includes(data.priority)) {
-        throw new Error('Priority must be low, medium, or high');
+      if (data.priority && !['low', 'medium', 'high', 'critical'].includes(data.priority)) {
+        throw new Error('Priority must be low, medium, high, or critical');
       }
       return await API.createTicket(data);
     } catch (error) {
@@ -53,17 +53,17 @@ class TicketService {
   async updateTicket(id, data) {
     try {
       if (!id) throw new Error('Ticket ID is required');
-      
+
       // Validate status if provided
-      if (data.status && !['open', 'in-progress', 'closed', 'resolved'].includes(data.status)) {
+      if (data.status && !['open', 'in_progress', 'closed', 'resolved'].includes(data.status)) {
         throw new Error('Invalid ticket status');
       }
-      
+
       // Validate priority if provided
-      if (data.priority && !['low', 'medium', 'high'].includes(data.priority)) {
-        throw new Error('Priority must be low, medium, or high');
+      if (data.priority && !['low', 'medium', 'high', 'critical'].includes(data.priority)) {
+        throw new Error('Priority must be low, medium, high, or critical');
       }
-      
+
       return await API.updateTicket(id, data);
     } catch (error) {
       throw this.formatError(error);
@@ -90,7 +90,7 @@ class TicketService {
       return {
         total: tickets.length,
         open: tickets.filter(t => t.status === 'open').length,
-        inProgress: tickets.filter(t => t.status === 'in-progress').length,
+        inProgress: tickets.filter(t => t.status === 'in_progress').length,
         closed: tickets.filter(t => t.status === 'closed').length,
         resolved: tickets.filter(t => t.status === 'resolved').length,
         byPriority: {
@@ -109,7 +109,7 @@ class TicketService {
    */
   filterByStatus(tickets = [], status) {
     try {
-      if (!['open', 'in-progress', 'closed', 'resolved'].includes(status)) {
+      if (!['open', 'in_progress', 'closed', 'resolved'].includes(status)) {
         throw new Error('Invalid status filter');
       }
       return tickets.filter(t => t.status === status);
@@ -123,7 +123,7 @@ class TicketService {
    */
   filterByPriority(tickets = [], priority) {
     try {
-      if (!['low', 'medium', 'high'].includes(priority)) {
+      if (!['low', 'medium', 'high', 'critical'].includes(priority)) {
         throw new Error('Invalid priority filter');
       }
       return tickets.filter(t => t.priority === priority);

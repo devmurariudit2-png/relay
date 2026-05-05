@@ -7,14 +7,16 @@ class GetStatusService extends BaseService {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
+    const userId = this.userId || (this.user && (this.user.id || this.user._id));
+
     const [profileResult, txResult] = await Promise.all([
       supabase.from('profiles')
         .select('*')
-        .eq('id', this.userId)
+        .eq('id', userId)
         .single(),
       supabase.from('transactions')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', this.userId)
+        .eq('user_id', userId)
         .gte('created_at', startOfMonth.toISOString())
     ]);
 
