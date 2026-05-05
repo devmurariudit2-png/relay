@@ -52,10 +52,28 @@ class ReconcileService extends BaseService {
     }
 
     // ── 4. Pass 2 — exact amount + date within 3 days ──────────────────────────
+    // ⚡ Bolt Optimization: Replaced O(n²) nested loop with O(n) hash map lookup
+    // Grouping internal transactions by rounded amount reduces iteration to only candidates with the same amount.
+    const internalByAmount = new Map();
+    for (const i of internal) {
+      if (usedI.has(i.id)) continue;
+      const amtKey = Math.round(i.amount * 100);
+      let list = internalByAmount.get(amtKey);
+      if (!list) {
+        list = [];
+        internalByAmount.set(amtKey, list);
+      }
+      list.push(i);
+    }
+
     for (const b of bank) {
       if (usedB.has(b.id)) continue;
+      const amtKey = Math.round(b.amount * 100);
+      const candidates = internalByAmount.get(amtKey);
+      if (!candidates) continue;
+
       const bd = new Date(b.date).getTime();
-      for (const i of internal) {
+      for (const i of candidates) {
         if (usedI.has(i.id)) continue;
         const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
         if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
