@@ -151,7 +151,7 @@ router.put('/profile',
       const userId = req.user.id || req.user._id;
       if (!userId) return R.badRequest(res, 'User ID not found in token');
 
-      const upsertPayload = { id: userId };
+      const upsertPayload = { id: userId, email: req.user.email };
       if (name) upsertPayload.full_name = name;
       if (currency) upsertPayload.currency = currency;
 

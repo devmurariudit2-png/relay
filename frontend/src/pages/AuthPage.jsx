@@ -186,27 +186,27 @@ export default function AuthPage({ onLogin, onBack }) {
 
               {mode === "register" && (
                 <div className="w-full space-y-1.5">
-                  <label className="text-[13px] font-semibold text-gray-700">Full Name</label>
-                  <input required className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 placeholder-gray-400" placeholder="Sarah Kim" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+                  <label htmlFor="name" className="text-[13px] font-semibold text-gray-700">Full Name</label>
+                  <input id="name" required className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed" placeholder="Sarah Kim" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} disabled={loading} autoComplete="name" />
                 </div>
               )}
 
               <div className="w-full space-y-1.5">
-                <label className="text-[13px] font-semibold text-gray-700">Email address</label>
-                <input required className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 placeholder-gray-400" type="email" placeholder="you@company.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
+                <label htmlFor="email" className="text-[13px] font-semibold text-gray-700">Email address</label>
+                <input id="email" required className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed" type="email" placeholder="you@company.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} disabled={loading} autoComplete="email" />
               </div>
 
               {mode !== "forgot" && (
                 <div className="w-full space-y-1.5">
                   <div className="flex justify-between">
-                    <label className="text-[13px] font-semibold text-gray-700">Password</label>
+                    <label htmlFor="password" className="text-[13px] font-semibold text-gray-700">Password</label>
                     {mode === "login" && (
                       <button type="button" onClick={() => switchMode("forgot")} className="text-sm font-medium text-red-600 hover:underline bg-transparent border-none cursor-pointer p-0">
                         Forgot password?
                       </button>
                     )}
                   </div>
-                  <input required className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 placeholder-gray-400" type="password" placeholder="••••••••" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} />
+                  <input id="password" required className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed" type="password" placeholder="••••••••" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} disabled={loading} autoComplete={mode === "register" ? "new-password" : "current-password"} />
                 </div>
               )}
 
