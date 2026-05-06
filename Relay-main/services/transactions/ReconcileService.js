@@ -52,10 +52,24 @@ class ReconcileService extends BaseService {
     }
 
     // ── 4. Pass 2 — exact amount + date within 3 days ──────────────────────────
+    // ⚡ Bolt: O(N) Optimization - Pre-group internal transactions by exact amount (rounded to cents)
+    // This reduces the complexity from O(N^2) to O(N) by eliminating the inner loop over all internal transactions.
+    const internalByAmount = new Map();
+    for (const i of internal) {
+      if (usedI.has(i.id)) continue;
+      const amtKey = Math.round(i.amount * 100);
+      if (!internalByAmount.has(amtKey)) internalByAmount.set(amtKey, []);
+      internalByAmount.get(amtKey).push(i);
+    }
+
     for (const b of bank) {
       if (usedB.has(b.id)) continue;
       const bd = new Date(b.date).getTime();
-      for (const i of internal) {
+      const amtKey = Math.round(b.amount * 100);
+      const candidates = internalByAmount.get(amtKey);
+      if (!candidates) continue;
+
+      for (const i of candidates) {
         if (usedI.has(i.id)) continue;
         const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
         if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
