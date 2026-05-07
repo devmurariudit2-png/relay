@@ -33,13 +33,26 @@ const reconcile = (bank, internal) => {
   }
 
   // 2. Pass 2 — Exact Amount + Date within 3 days
+  // ⚡ Bolt: Pre-group internal transactions by amount (O(N) vs O(N²))
+  const internalByAmount = new Map();
+  for (const i of internal) {
+    if (usedI.has(i.id)) continue;
+    const amtKey = Math.round(i.amount * 100);
+    if (!internalByAmount.has(amtKey)) internalByAmount.set(amtKey, []);
+    internalByAmount.get(amtKey).push(i);
+  }
+
   for (const b of bank) {
     if (usedB.has(b.id)) continue;
+    const amtKey = Math.round(b.amount * 100);
+    const candidates = internalByAmount.get(amtKey);
+    if (!candidates) continue;
+
     const bd = new Date(b.date).getTime();
-    for (const i of internal) {
+    for (const i of candidates) {
       if (usedI.has(i.id)) continue;
       const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
-      if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
+      if (dayDiff <= 3) {
         matches.push({ bankId: b.id, internalId: i.id });
         usedB.add(b.id);
         usedI.add(i.id);

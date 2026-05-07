@@ -29,7 +29,9 @@ jobs:
         run: npm ci
 
       - name: Run Backend Tests
-        run: npm test -w Relay-main
+        run: |
+          npm install @rolldown/binding-linux-x64-gnu --no-save -w Relay-main
+          SUPABASE_URL=http://mock.com SUPABASE_SERVICE_ROLE_KEY=mock npm test -w Relay-main
 
   e2e-tests:
     name: Run Playwright E2E Tests
@@ -48,11 +50,20 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Install Playwright
+        run: npm install @playwright/test --no-save
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Start Frontend Server
+        run: |
+          npm install @rollup/rollup-linux-x64-gnu lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu --no-save -w frontend
+          VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_ANON_KEY=dummy_key npm run dev -w frontend &
+          sleep 5
+
       - name: Run Playwright Tests
-        run: npx playwright test
+        run: BASE_URL=http://localhost:3000 npx playwright test
 
   deploy-database:
     name: Push Database Migrations
