@@ -33,18 +33,39 @@ const reconcile = (bank, internal) => {
   }
 
   // 2. Pass 2 — Exact Amount + Date within 3 days
+  // ⚡ Bolt: Optimized O(N^2) loop to O(N) using Map grouped by rounded amount
+  const internalByAmount = new Map();
+  for (const i of internal) {
+    if (usedI.has(i.id)) continue;
+    const amountKey = Math.round(i.amount * 100);
+    if (!internalByAmount.has(amountKey)) internalByAmount.set(amountKey, []);
+    internalByAmount.get(amountKey).push(i);
+  }
+
   for (const b of bank) {
     if (usedB.has(b.id)) continue;
+    const amountKey = Math.round(b.amount * 100);
     const bd = new Date(b.date).getTime();
-    for (const i of internal) {
-      if (usedI.has(i.id)) continue;
-      const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
-      if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
-        matches.push({ bankId: b.id, internalId: i.id });
-        usedB.add(b.id);
-        usedI.add(i.id);
-        break;
+
+    const keysToCheck = [amountKey - 1, amountKey, amountKey + 1];
+    let matched = false;
+
+    for (const key of keysToCheck) {
+      const candidates = internalByAmount.get(key);
+      if (!candidates) continue;
+
+      for (const i of candidates) {
+        if (usedI.has(i.id)) continue;
+        const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
+        if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
+          matches.push({ bankId: b.id, internalId: i.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
+          matched = true;
+          break;
+        }
       }
+      if (matched) break;
     }
   }
 
