@@ -1,0 +1,3 @@
+## 2024-05-09 - [Optimized reconcile engine O(N^2) to O(N)]
+**Learning:** In the `reconcileEngine.js` Pass 2 logic, comparing bank and internal transactions with matching amounts was done using a nested loop comparing every remaining un-matched transaction. Since amounts can have up to `0.01` float discrepancy, using a Map strictly for `amount` needed care.
+**Action:** By converting amounts to integer pennies `Math.round(amount * 100)` and performing exact Map lookups for the rounded `amountKey`, `amountKey - 1`, and `amountKey + 1`, we were able to filter down the fuzzy exact amount candidates and reduce the time complexity from O(N^2) to O(N).
