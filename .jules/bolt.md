@@ -1,0 +1,3 @@
+## 2024-05-24 - [O(n^2) Float Matching Optimized with Buckets]
+**Learning:** [When converting a fuzzy floating-point match like `Math.abs(A - B) < 0.01` from an O(n^2) nested loop to an O(n) Hash Map, grouping by exactly `Math.round(A * 100)` and looking up `key` is insufficient. The valid matches might fall precisely on rounding boundaries (e.g., 9.996 and 10.005 differ by 0.009 but round to 1000 and 1001). Looking up `key-1`, `key`, and `key+1` is necessary and completely safe for resolving matches across boundaries within this threshold without missing valid elements.]
+**Action:** [Always analyze boundary effects when hashing floating-point ranges or values. Look up adjacent buckets to preserve exact original logic.]
