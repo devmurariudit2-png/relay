@@ -34,8 +34,8 @@ jobs:
       - name: Run Backend Tests
         run: npm test -w Relay-main
         env:
-          SUPABASE_URL: http://dummy
-          SUPABASE_SERVICE_ROLE_KEY: dummy
+          SUPABASE_URL: http://dummy.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: dummykey
 
   e2e-tests:
     name: Run Playwright E2E Tests
