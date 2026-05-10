@@ -15,9 +15,9 @@ test.describe('Authentication & Routing Flow', () => {
 
         // Verify core UI elements exist on the page
         // Note: Adjust the accessible names (name/placeholder) based on your actual AuthPage.jsx UI
-        await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
-        await expect(page.getByPlaceholder(/email/i)).toBeVisible();
-        await expect(page.getByPlaceholder(/password/i)).toBeVisible();
+        await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible();
+        await expect(page.getByPlaceholder(/you@company.com/i)).toBeVisible();
+        await expect(page.getByPlaceholder(/••••••••/i)).toBeVisible();
         await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
     });
 });
