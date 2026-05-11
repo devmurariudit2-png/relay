@@ -29,7 +29,10 @@ jobs:
         run: npm ci
 
       - name: Run Backend Tests
-        run: npm test -w Relay-main
+        run: npm install @rolldown/binding-linux-x64-gnu --no-save -w Relay-main && npm test -w Relay-main
+        env:
+          SUPABASE_URL: dummy
+          SUPABASE_SERVICE_ROLE_KEY: dummy
 
   e2e-tests:
     name: Run Playwright E2E Tests
@@ -49,10 +52,13 @@ jobs:
         run: npm ci
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+        run: npm install @playwright/test --no-save && npx playwright install --with-deps chromium
 
       - name: Run Playwright Tests
         run: npx playwright test
+        env:
+          VITE_SUPABASE_URL: dummy
+          VITE_SUPABASE_ANON_KEY: dummy
 
   deploy-database:
     name: Push Database Migrations
