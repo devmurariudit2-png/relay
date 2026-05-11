@@ -33,18 +33,39 @@ const reconcile = (bank, internal) => {
   }
 
   // 2. Pass 2 — Exact Amount + Date within 3 days
+  // Optimization: Group by rounded amount to avoid O(N^2) loops.
+  const internalByAmount = new Map();
+  for (const i of internal) {
+    if (usedI.has(i.id)) continue;
+    const key = Math.round(i.amount * 100);
+    if (!internalByAmount.has(key)) internalByAmount.set(key, []);
+    internalByAmount.get(key).push(i);
+  }
+
   for (const b of bank) {
     if (usedB.has(b.id)) continue;
     const bd = new Date(b.date).getTime();
-    for (const i of internal) {
-      if (usedI.has(i.id)) continue;
-      const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
-      if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
-        matches.push({ bankId: b.id, internalId: i.id });
-        usedB.add(b.id);
-        usedI.add(i.id);
-        break;
+    const baseKey = Math.round(b.amount * 100);
+
+    let matched = false;
+    // Since we look for a difference < 0.01, checking baseKey - 1, baseKey, and baseKey + 1
+    // covers all possible rounding boundary cases for floats.
+    for (const key of [baseKey - 1, baseKey, baseKey + 1]) {
+      const candidates = internalByAmount.get(key);
+      if (!candidates) continue;
+
+      for (const i of candidates) {
+        if (usedI.has(i.id)) continue;
+        const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
+        if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
+          matches.push({ bankId: b.id, internalId: i.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
+          matched = true;
+          break;
+        }
       }
+      if (matched) break;
     }
   }
 
