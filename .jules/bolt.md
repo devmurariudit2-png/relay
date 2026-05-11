@@ -1,0 +1,3 @@
+## 2025-02-23 - Optimize reconcileEngine exact amount lookup using Map
+**Learning:** O(N^2) loops in data processing services like `reconcileEngine.js` can be huge bottlenecks. Using a `Map` to group items by a key derived from their exact attributes (like `Math.round(amount * 100)`) reduces the operation to O(N). Because of floating point inaccuracies, we have to look up the key minus 1, exactly the key, and the key plus 1.
+**Action:** When searching for matches based on numeric values that might be slightly rounded or fuzzy, use a Map to group by the rounded integer, then look up adjacent buckets. This keeps the time complexity O(N).
