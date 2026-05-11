@@ -29,7 +29,7 @@ jobs:
         run: npm ci
 
       - name: Run Backend Tests
-        run: npm install @rolldown/binding-linux-x64-gnu --no-save -w Relay-main && npm test -w Relay-main
+        run: npm install @rolldown/binding-linux-x64-gnu --no-save -w Relay-main && SUPABASE_URL=http://dummy SUPABASE_SERVICE_ROLE_KEY=dummy npm test -w Relay-main
         env:
           SUPABASE_URL: dummy
           SUPABASE_SERVICE_ROLE_KEY: dummy
@@ -55,7 +55,7 @@ jobs:
         run: npm install @playwright/test --no-save && npx playwright install --with-deps chromium
 
       - name: Run Playwright Tests
-        run: npx playwright test
+        run: cd frontend && npm install @rolldown/binding-linux-x64-gnu @rollup/rollup-linux-x64-gnu lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu --no-save && cd .. && VITE_SUPABASE_URL=http://dummy VITE_SUPABASE_ANON_KEY=dummy npx playwright test
         env:
           VITE_SUPABASE_URL: dummy
           VITE_SUPABASE_ANON_KEY: dummy
