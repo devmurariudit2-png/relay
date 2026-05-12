@@ -52,18 +52,40 @@ class ReconcileService extends BaseService {
     }
 
     // ── 4. Pass 2 — exact amount + date within 3 days ──────────────────────────
+    // ⚡ Bolt: Replaced O(N²) nested loop with O(N) hash map lookup
+    const internalByAmount = new Map();
+    for (const i of internal) {
+      if (usedI.has(i.id)) continue;
+      const amountKey = Math.round(i.amount * 100);
+      if (!internalByAmount.has(amountKey)) internalByAmount.set(amountKey, []);
+      internalByAmount.get(amountKey).push(i);
+    }
+
     for (const b of bank) {
       if (usedB.has(b.id)) continue;
       const bd = new Date(b.date).getTime();
-      for (const i of internal) {
-        if (usedI.has(i.id)) continue;
-        const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
-        if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
-          updates.push({ id: b.id, status: 'matched', matched_id: i.id });
-          updates.push({ id: i.id, status: 'matched', matched_id: b.id });
-          usedB.add(b.id);
-          usedI.add(i.id);
-          break;
+      const amountKey = Math.round(b.amount * 100);
+
+      const candidateKeys = [amountKey - 1, amountKey, amountKey + 1];
+      let matched = false;
+
+      for (const key of candidateKeys) {
+        if (matched) break;
+        const candidates = internalByAmount.get(key);
+        if (!candidates) continue;
+
+        for (const i of candidates) {
+          if (usedI.has(i.id)) continue;
+
+          const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
+          if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
+            updates.push({ id: b.id, status: 'matched', matched_id: i.id });
+            updates.push({ id: i.id, status: 'matched', matched_id: b.id });
+            usedB.add(b.id);
+            usedI.add(i.id);
+            matched = true;
+            break;
+          }
         }
       }
     }
