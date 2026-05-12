@@ -1,0 +1,3 @@
+## 2024-05-24 - Reconcile Engine Exact Match Optimization
+**Learning:** The O(N^2) exact amount matching in ReconcileService is a massive bottleneck for high transaction volumes. However, fuzzy matching (within 0.01 threshold) means we cannot use a simple strict equality hash lookup. A mathematically sound O(N) approach is to bucket by `Math.round(amount * 100)` and search adjacent buckets (key-1, key, key+1) to guarantee finding matches across rounding boundaries without nested loops.
+**Action:** When optimizing fuzzy O(N^2) loops with thresholds, map the data to integer buckets and check adjacent buckets instead of dropping back to nested loops.
