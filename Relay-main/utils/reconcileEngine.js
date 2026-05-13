@@ -33,17 +33,40 @@ const reconcile = (bank, internal) => {
   }
 
   // 2. Pass 2 — Exact Amount + Date within 3 days
+  // Optimized: Changed O(N²) loop into O(N) by grouping internal transactions by amount.
+  // Using Math.round(amount * 100) as key and checking key-1, key, key+1 to handle float variance < 0.01.
+  const internalByAmount = new Map();
+  for (const i of internal) {
+    if (usedI.has(i.id)) continue;
+    const key = Math.round(i.amount * 100);
+    if (!internalByAmount.has(key)) internalByAmount.set(key, []);
+    internalByAmount.get(key).push({ item: i, time: new Date(i.date).getTime() });
+  }
+
   for (const b of bank) {
     if (usedB.has(b.id)) continue;
     const bd = new Date(b.date).getTime();
-    for (const i of internal) {
-      if (usedI.has(i.id)) continue;
-      const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
-      if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
-        matches.push({ bankId: b.id, internalId: i.id });
-        usedB.add(b.id);
-        usedI.add(i.id);
-        break;
+    const bKey = Math.round(b.amount * 100);
+
+    const keysToCheck = [bKey, bKey - 1, bKey + 1];
+    let matched = false;
+
+    for (const key of keysToCheck) {
+      if (matched) break;
+      const candidates = internalByAmount.get(key);
+      if (!candidates) continue;
+
+      for (const c of candidates) {
+        const i = c.item;
+        if (usedI.has(i.id)) continue;
+        const dayDiff = Math.abs(c.time - bd) / 86400000;
+        if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
+          matches.push({ bankId: b.id, internalId: i.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
+          matched = true;
+          break;
+        }
       }
     }
   }
