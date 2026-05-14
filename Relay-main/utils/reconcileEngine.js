@@ -33,18 +33,38 @@ const reconcile = (bank, internal) => {
   }
 
   // 2. Pass 2 — Exact Amount + Date within 3 days
+  // Optimized: O(N) lookup by pre-grouping internal transactions by amount
+  const internalByAmount = new Map();
+  for (const i of internal) {
+    if (usedI.has(i.id)) continue;
+    const amtKey = Math.round(i.amount * 100);
+    if (!internalByAmount.has(amtKey)) internalByAmount.set(amtKey, []);
+    internalByAmount.get(amtKey).push(i);
+  }
+
   for (const b of bank) {
     if (usedB.has(b.id)) continue;
     const bd = new Date(b.date).getTime();
-    for (const i of internal) {
-      if (usedI.has(i.id)) continue;
-      const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
-      if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
-        matches.push({ bankId: b.id, internalId: i.id });
-        usedB.add(b.id);
-        usedI.add(i.id);
-        break;
+    const amtKey = Math.round(b.amount * 100);
+
+    let matched = false;
+    // Check key-1, key, and key+1 to handle boundaries like 100.004 vs 100.006 (diff < 0.01 but keys 10000 and 10001)
+    for (const key of [amtKey - 1, amtKey, amtKey + 1]) {
+      const candidates = internalByAmount.get(key);
+      if (!candidates) continue;
+
+      for (const i of candidates) {
+        if (usedI.has(i.id)) continue;
+        const dayDiff = Math.abs(new Date(i.date).getTime() - bd) / 86400000;
+        if (Math.abs(i.amount - b.amount) < 0.01 && dayDiff <= 3) {
+          matches.push({ bankId: b.id, internalId: i.id });
+          usedB.add(b.id);
+          usedI.add(i.id);
+          matched = true;
+          break; // Break candidates loop
+        }
       }
+      if (matched) break; // Break keys loop
     }
   }
 
