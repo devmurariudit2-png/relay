@@ -10,7 +10,7 @@ const GetTransactionSummaryService = require('../Relay-main/services/transaction
 
 async function runSmokeTest() {
   console.log('🚀 Starting Relay Platform Smoke Test...\n');
-  
+
   // 1. Connection Test
   const { data: health, error: healthErr } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
   if (healthErr) {
