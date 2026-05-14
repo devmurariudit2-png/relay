@@ -60,6 +60,9 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Install frontend native bindings
+        run: npm install @rollup/rollup-linux-x64-gnu lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu --no-save -w frontend
+
       - name: Run Playwright Tests
         run: npx playwright test
         env:
