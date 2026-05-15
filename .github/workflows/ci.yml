@@ -28,8 +28,14 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Install Missing Native Bindings
+        run: npm install @rolldown/binding-linux-x64-gnu --no-save -w Relay-main
+
       - name: Run Backend Tests
         run: npm test -w Relay-main
+        env:
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_SERVICE_ROLE_KEY: dummy_key
 
   e2e-tests:
     name: Run Playwright E2E Tests
@@ -48,11 +54,19 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Install Playwright
+        run: npm install @playwright/test --no-save
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright Tests
         run: npx playwright test
+        env:
+          VITE_SUPABASE_URL: http://localhost:54321
+          VITE_SUPABASE_ANON_KEY: dummy_key
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_SERVICE_ROLE_KEY: dummy_key
 
   deploy-database:
     name: Push Database Migrations
