@@ -65,6 +65,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: http://localhost:54321
           VITE_SUPABASE_ANON_KEY: dummy_key
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_SERVICE_ROLE_KEY: dummy_key
 
   deploy-database:
     name: Push Database Migrations
