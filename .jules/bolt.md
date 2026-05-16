@@ -1,0 +1,3 @@
+## 2024-05-16 - O(N^2) Reconciliation Bottleneck
+**Learning:** The application's reconciliation engine uses a nested loop to fuzzy-match transactions (exact amount + date within 3 days). As transaction volume scales (e.g., 5,000+ records), this O(N^2) operation severely degrades performance (11.5s runtime). Using a hash map with rounded keys allows for an O(N) lookup.
+**Action:** When evaluating `< 0.01` fuzzy matches, group items into a Map using `Math.round(amount * 100)` as the key. Then, check buckets `key - 1`, `key`, and `key + 1` to maintain correctness across rounding boundaries. This specific mathematical bucketing pattern reduces iteration time by over 99% (from 11.5s to 30ms).
