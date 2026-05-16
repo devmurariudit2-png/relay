@@ -60,8 +60,11 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright Tests
-        run: npx playwright test
+      - name: Start Servers and Run Playwright Tests
+        run: |
+          npm run dev &
+          npx wait-on http://localhost:3000
+          npx playwright test
         env:
           VITE_SUPABASE_URL: http://localhost:54321
           VITE_SUPABASE_ANON_KEY: dummy_key
