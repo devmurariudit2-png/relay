@@ -1,0 +1,3 @@
+## 2024-05-18 - [Optimize Reconcile Engine]
+**Learning:** ReconcileEngine.js pass 2 iterates over `bank` and `internal` matching exactly amounts and dates within 3 days. This was previously implemented using a nested O(n²) loop checking each bank against all internal. Using an intermediate map group by rounded amount (cents) with lookup checking `key-1`, `key`, `key+1` cuts complexity to roughly O(n) decreasing execution time from ~1800ms down to ~237ms for 10000 transactions.
+**Action:** Replace nested loops with map lookups in reconciliation workflows, remembering to check bounding buckets for fuzzy value comparisons like float amounts where an exact math rounding might drift.
