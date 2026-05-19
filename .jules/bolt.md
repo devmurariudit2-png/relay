@@ -1,0 +1,3 @@
+## 2024-05-15 - [Reconciliation Pass 2 Optimization]
+**Learning:** Reconciling arrays using nested loops ($O(N \times M)$) is a significant bottleneck when matching floating point numbers within a 0.01 tolerance bounds. Grouping candidates using a Map by `Math.round(amount * 100)` and performing $O(1)$ lookups on key +/- 1 completely solves this while preserving the exact float limits.
+**Action:** Always pre-group array data using a Map for joining logic. For approximate matching on numbers within bounds, evaluate if rounding into map keys and checking adjacent neighbors can replace iterative boundary checks.
