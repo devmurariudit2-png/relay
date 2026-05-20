@@ -1,0 +1,3 @@
+## 2024-05-20 - [O(N^2) Reconciliation Pattern]
+**Learning:** The transaction reconciliation logic (e.g., in `ReconcileService.js` and `reconcileEngine.js`) processes large datasets and is highly performance-critical. The Pass 2 matching used a nested loop leading to O(N^2) complexity. When converting to an O(N) Map lookup, exact matching on amounts fails due to floating point inaccuracies and the 0.01 tolerance crossing rounding boundaries.
+**Action:** When matching amounts within a threshold (like < 0.01), pre-group candidates in a Map using a rounded value (e.g., `Math.round(amount * 100)`), and then evaluate lookups checking offsets `key - 1`, `key`, and `key + 1` to prevent missing valid matches.
